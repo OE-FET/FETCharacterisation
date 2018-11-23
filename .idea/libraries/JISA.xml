@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="JISA">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/JISA.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/lib/JISA.jar!/src" />
+      <root url="jar://$PROJECT_DIR$/lib/JISA.jar!/" />
+    </SOURCES>
+  </library>
+</component>
