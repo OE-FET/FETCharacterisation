@@ -146,8 +146,9 @@ public class Main extends GUI {
         countT.set(AVERAGE_COUNT);
         delayT.set(DELAY_TIME);
 
-        transferGrid.addToolbarButton("Start", Main::doTransfer);
-        transferGrid.addToolbarButton("Stop", Main::stopExperiment);
+        transferGrid.addToolbarButton("Clear Transfer", () -> transferResults.clear());
+        transferGrid.addToolbarButton("Start Transfer", Main::doTransfer);
+        transferGrid.addToolbarButton("Stop Experiment", Main::stopExperiment);
         transferGrid.setNumColumns(2);
         tabs.addTab(transferGrid);
 
@@ -190,8 +191,9 @@ public class Main extends GUI {
 
         plot.showMarkers(false);
 
-        grid.addToolbarButton("Start", Main::doOutput);
-        grid.addToolbarButton("Stop", Main::stopExperiment);
+        grid.addToolbarButton("Clear Output", () -> outputResults.clear());
+        grid.addToolbarButton("Start Output", Main::doOutput);
+        grid.addToolbarButton("Stop Experiment", Main::stopExperiment);
         grid.setNumColumns(2);
 
         tabs.addTab(grid);
