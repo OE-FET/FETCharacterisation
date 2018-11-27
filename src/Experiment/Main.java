@@ -17,61 +17,66 @@ import JISA.VISA.*;
  */
 public class Main extends GUI {
 
-    static final double MIN_SD_VOLTAGE   = -5.0;
-    static final double MAX_SD_VOLTAGE   = -60;
-    static final int    STEPS_SD_VOLTAGE = 2;
+    private static final double MIN_SD_VOLTAGE   = -5.0;
+    private static final double MAX_SD_VOLTAGE   = -60;
+    private static final int    STEPS_SD_VOLTAGE = 2;
 
-    static final double MIN_G_VOLTAGE   = 0;
-    static final double MAX_G_VOLTAGE   = -60;
-    static final int    STEPS_G_VOLTAGE = 61;
+    private static final double MIN_G_VOLTAGE   = 0;
+    private static final double MAX_G_VOLTAGE   = -60;
+    private static final int    STEPS_G_VOLTAGE = 61;
 
-    static final double CURRENT_LIMIT = 1e-3;
-    static final int    AVERAGE_COUNT = 25;
-    static final double DELAY_TIME    = 0.5;
+    private static final double CURRENT_LIMIT = 1e-3;
+    private static final int    AVERAGE_COUNT = 25;
+    private static final double DELAY_TIME    = 0.5;
 
-    static final double MIN_SD_VOLTAGE_OUTPUT   = 0.0;
-    static final double MAX_SD_VOLTAGE_OUTPUT   = -60.0;
-    static final int    STEPS_SD_VOLTAGE_OUTPUT = 61;
+    private static final double MIN_SD_VOLTAGE_OUTPUT   = 0.0;
+    private static final double MAX_SD_VOLTAGE_OUTPUT   = -60.0;
+    private static final int    STEPS_SD_VOLTAGE_OUTPUT = 61;
 
-    static final double MIN_GATE_VOLTAGE_OUTPUT   = 0.0;
-    static final double MAX_GATE_VOLTAGE_OUTPUT   = -60.0;
-    static final int    STEPS_GATE_VOLTAGE_OUTPUT = 7;
+    private static final double MIN_GATE_VOLTAGE_OUTPUT   = 0.0;
+    private static final double MAX_GATE_VOLTAGE_OUTPUT   = -60.0;
+    private static final int    STEPS_GATE_VOLTAGE_OUTPUT = 7;
 
-    static SetGettable<Double>  minGateT;
-    static SetGettable<Double>  maxGateT;
-    static SetGettable<Integer> gateStepsT;
-    static SetGettable<Double>  minSDT;
-    static SetGettable<Double>  maxSDT;
-    static SetGettable<Integer> sdStepsT;
-    static SetGettable<Double>  limitT;
-    static SetGettable<Integer> countT;
-    static SetGettable<Double>  delayT;
-    static SetGettable<String>  fileT;
-    static SetGettable<Boolean> fourProbeT;
-    static ResultList           transferResults;
+    private static SetGettable<Double>  minGateT;
+    private static SetGettable<Double>  maxGateT;
+    private static SetGettable<Integer> gateStepsT;
+    private static SetGettable<Double>  minSDT;
+    private static SetGettable<Double>  maxSDT;
+    private static SetGettable<Integer> sdStepsT;
+    private static SetGettable<Double>  limitT;
+    private static SetGettable<Integer> countT;
+    private static SetGettable<Double>  delayT;
+    private static SetGettable<String>  fileT;
+    private static SetGettable<Boolean> fourProbeT;
+    private static ResultList           transferResults;
 
-    static SetGettable<Double>  minGateO;
-    static SetGettable<Double>  maxGateO;
-    static SetGettable<Integer> gateStepsO;
-    static SetGettable<Double>  minSDO;
-    static SetGettable<Double>  maxSDO;
-    static SetGettable<Integer> sdStepsO;
-    static SetGettable<Double>  limitO;
-    static SetGettable<Integer> countO;
-    static SetGettable<Double>  delayO;
-    static SetGettable<String>  fileO;
-    static ResultList           outputResults;
+    private static SetGettable<Double>  minGateO;
+    private static SetGettable<Double>  maxGateO;
+    private static SetGettable<Integer> gateStepsO;
+    private static SetGettable<Double>  minSDO;
+    private static SetGettable<Double>  maxSDO;
+    private static SetGettable<Integer> sdStepsO;
+    private static SetGettable<Double>  limitO;
+    private static SetGettable<Integer> countO;
+    private static SetGettable<Double>  delayO;
+    private static SetGettable<String>  fileO;
+    private static ResultList           outputResults;
 
-    static Tabs tabs;
+    private static Tabs tabs;
 
-    static boolean stopFlag = true;
+    private static boolean stopFlag = true;
 
-    static SMU smuSD;
-    static SMU smuG;
-    static SMU smu4P1;
-    static SMU smu4P2;
+    private static SetGettable<SMU> smu1;
+    private static SetGettable<SMU> smu2;
+    private static SetGettable<SMU> smu3;
+    private static SetGettable<SMU> smu4;
 
-    public static void run(String[] args) throws Exception {
+    private static SMU smuSD;
+    private static SMU smuG;
+    private static SMU smu4P1;
+    private static SMU smu4P2;
+
+    private static void run(String[] args) throws Exception {
 
 //        GUI.infoAlert("Select Device", "Keithley 2450", "Please select the Keithley 2450");
 //        smu1 = new K2450(GUI.browseVISA());
@@ -97,15 +102,19 @@ public class Main extends GUI {
         // Create the tabs
         tabs = new Tabs("FET Characterisation");
 
+        // Create each section of our GUI
         createTransferSection();
         createOutputSection();
+        createConnectionSection();
+        createConfigSection();
 
+        // Make sure the window is maximised and show it
         tabs.setMaximised(true);
         tabs.show();
 
     }
 
-    public static void createTransferSection() throws Exception {
+    private static void createTransferSection() throws Exception {
 
         // Create config panels
         Fields params = new Fields("Experiment Parameters");
@@ -120,6 +129,7 @@ public class Main extends GUI {
         // Put them all in a grid
         Grid transferGrid = new Grid("Transfer Curve", params, config, table, plot);
 
+        // Add fields to panels, returning SetGettable objects which allow use to query and set the value in each field
         minGateT = params.addDoubleField("Min Gate [V]");
         maxGateT = params.addDoubleField("Max Gate [V]");
         gateStepsT = params.addIntegerField("No. Steps");
@@ -134,6 +144,7 @@ public class Main extends GUI {
         fileT = config.addFileSave("Output File");
         fourProbeT = config.addCheckBox("Four Probe Measurement?");
 
+        // Set the default values
         minGateT.set(MIN_G_VOLTAGE);
         maxGateT.set(MAX_G_VOLTAGE);
         gateStepsT.set(STEPS_G_VOLTAGE);
@@ -146,7 +157,8 @@ public class Main extends GUI {
         countT.set(AVERAGE_COUNT);
         delayT.set(DELAY_TIME);
 
-        transferGrid.addToolbarButton("Clear Transfer", () -> transferResults.clear());
+        // Add toolbar buttons
+        transferGrid.addToolbarButton("Clear Transfer", transferResults::clear);
         transferGrid.addToolbarButton("Start Transfer", Main::doTransfer);
         transferGrid.addToolbarButton("Stop Experiment", Main::stopExperiment);
         transferGrid.setNumColumns(2);
@@ -154,7 +166,7 @@ public class Main extends GUI {
 
     }
 
-    public static void createOutputSection() throws Exception {
+    private static void createOutputSection() throws Exception {
 
         // Create config panels
         Fields params = new Fields("Experiment Parameters");
@@ -201,11 +213,182 @@ public class Main extends GUI {
 
     }
 
-    public static void stopExperiment() {
+    private static void createConnectionSection() throws Exception {
+
+        // Create a ConfigGrid - a grid of Instrument Connection configuration panels
+        ConfigGrid grid = new ConfigGrid("Connection Config");
+        grid.setNumColumns(2);
+
+        // Add instruments to configure, returns GetSettable objects for the relevant instrument objects
+        smu1 = grid.addInstrument("SMU 1", SMU.class);
+        smu2 = grid.addInstrument("SMU 2", SMU.class);
+        smu3 = grid.addInstrument("SMU 3", SMU.class);
+        smu4 = grid.addInstrument("SMU 4", SMU.class);
+
+        // Add this section to the tabs
+        tabs.addTab(grid);
+
+    }
+
+    private static void createConfigSection() throws Exception {
+
+        Fields               sourceDrain = new Fields("Source-Drain SMU");
+        SetGettable<Integer> sdSMU       = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
+        SetGettable<Integer> sdChannel   = sourceDrain.addIntegerField("Channel Number");
+
+        SetGettable<SMU>[] SMUs = new SetGettable[]{smu1, smu2, smu3, smu4};
+
+        sourceDrain.addButton("Apply", () -> {
+
+            if (sdSMU.get() < 0 || sdSMU.get() > 3) {
+                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+                return;
+            }
+
+            SMU smu = SMUs[sdSMU.get()].get();
+
+            if (smu == null) {
+                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+                return;
+            }
+
+            int channel = sdChannel.get();
+
+            if (smu instanceof MCSMU) {
+
+                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
+                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                    return;
+                }
+
+                smuSD = ((MCSMU) smu).getChannel(channel);
+
+            } else {
+                smuSD = smu;
+            }
+
+        });
+
+        Fields               sourceGate = new Fields("Source-Gate SMU");
+        SetGettable<Integer> sgSMU      = sourceGate.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
+        SetGettable<Integer> sgChannel  = sourceGate.addIntegerField("Channel Number");
+
+
+        sourceGate.addButton("Apply", () -> {
+
+            if (sgSMU.get() < 0 || sgSMU.get() > 3) {
+                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+                return;
+            }
+
+            SMU smu = SMUs[sgSMU.get()].get();
+
+            if (smu == null) {
+                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+                return;
+            }
+
+            int channel = sgChannel.get();
+
+            if (smu instanceof MCSMU) {
+
+                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
+                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                    return;
+                }
+
+                smuG = ((MCSMU) smu).getChannel(channel);
+
+            } else {
+                smuG = smu;
+            }
+
+        });
+
+        Fields               fourPoint1 = new Fields("Four-Point-Probe 1");
+        SetGettable<Integer> fp1SMU     = fourPoint1.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
+        SetGettable<Integer> fp1Channel = fourPoint1.addIntegerField("Channel Number");
+
+
+        fourPoint1.addButton("Apply", () -> {
+
+            if (fp1SMU.get() < 0 || fp1SMU.get() > 3) {
+                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+                return;
+            }
+
+            SMU smu = SMUs[fp1SMU.get()].get();
+
+            if (smu == null) {
+                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+                return;
+            }
+
+            int channel = fp1Channel.get();
+
+            if (smu instanceof MCSMU) {
+
+                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
+                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                    return;
+                }
+
+                smu4P1 = ((MCSMU) smu).getChannel(channel);
+
+            } else {
+                smu4P1 = smu;
+            }
+
+        });
+
+        Fields               fourPoint2 = new Fields("Four-Point-Probe 2");
+        SetGettable<Integer> fp2SMU     = fourPoint2.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
+        SetGettable<Integer> fp2Channel = fourPoint2.addIntegerField("Channel Number");
+
+
+        fourPoint2.addButton("Apply", () -> {
+
+            if (fp2SMU.get() < 0 || fp2SMU.get() > 3) {
+                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+                return;
+            }
+
+            SMU smu = SMUs[fp2SMU.get()].get();
+
+            if (smu == null) {
+                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+                return;
+            }
+
+            int channel = fp2Channel.get();
+
+            if (smu instanceof MCSMU) {
+
+                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
+                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                    return;
+                }
+
+                smu4P2 = ((MCSMU) smu).getChannel(channel);
+
+            } else {
+                smu4P2 = smu;
+            }
+
+        });
+
+        Grid grid = new Grid("Instrument Config", sourceDrain, sourceGate, fourPoint1, fourPoint2);
+        grid.setNumColumns(2);
+
+        tabs.addTab(grid);
+
+    }
+
+    private static void stopExperiment() {
         stopFlag = true;
     }
 
-    public static void doTransfer() throws Exception {
+    private static void doTransfer() throws Exception {
 
         if (!stopFlag) {
             GUI.errorAlert("Error", "Experiment Running", "Another experiment is already running.\n\nPlease wait until it has finished.");
@@ -320,7 +503,7 @@ public class Main extends GUI {
 
     }
 
-    public static void doOutput() throws Exception {
+    private static void doOutput() throws Exception {
 
         if (!stopFlag) {
             GUI.errorAlert("Error", "Experiment Running", "Another experiment is already running.\n\nPlease wait until it has finished.");
