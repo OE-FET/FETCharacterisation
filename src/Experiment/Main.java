@@ -78,12 +78,17 @@ public class Main extends GUI {
     private static SMU smu4P1 = null;
     private static SMU smu4P2 = null;
 
+    private static ConfigStore config;
+
     /**
      * Runs at start, this is where it all begins.
      *
      * @throws Exception Upon something going wrong
      */
     private static void run(String[] args) throws Exception {
+
+        // Create or load up config file
+        config = new ConfigStore("FETCharacterisation");
 
         // Create results storage
         transferResults = new ResultList("SD Voltage", "Gate Voltage", "Drain Current", "Leakage", "4PP 1", "4PP 2");
@@ -220,7 +225,7 @@ public class Main extends GUI {
     /**
      * Creates the "Connection Config" tab in the GUI for configuring how to connect to each instrument.
      */
-    private static void createConnectionSection() {
+    private static void createConnectionSection() throws Exception {
 
         // Create a ConfigGrid - a grid of Instrument Connection configuration panels
         ConfigGrid grid = new ConfigGrid("Connection Config");
@@ -232,9 +237,54 @@ public class Main extends GUI {
         smu3 = grid.addInstrument("SMU 3", SMU.class);
         smu4 = grid.addInstrument("SMU 4", SMU.class);
 
+        loadSMU(1, smu1);
+        loadSMU(2, smu2);
+        loadSMU(3, smu3);
+        loadSMU(4, smu4);
+
+        grid.connectAll();
+
+        grid.addToolbarButton("Save Config", () -> {
+
+            if (smu1.get() != null) {
+                config.set("SMU1Address", smu1.get().getAddress().getVISAAddress());
+                config.set("SMU1Driver", smu1.get().getClass().getName());
+            }
+
+            if (smu2.get() != null) {
+                config.set("SMU2Address", smu2.get().getAddress().getVISAAddress());
+                config.set("SMU2Driver", smu2.get().getClass().getName());
+            }
+
+            if (smu3.get() != null) {
+                config.set("SMU3Address", smu3.get().getAddress().getVISAAddress());
+                config.set("SMU3Driver", smu3.get().getClass().getName());
+            }
+
+            if (smu4.get() != null) {
+                config.set("SMU4Address", smu4.get().getAddress().getVISAAddress());
+                config.set("SMU4Driver", smu4.get().getClass().getName());
+            }
+
+            config.save();
+
+        });
+
         // Add this section to the tabs
         tabs.addTab(grid);
 
+    }
+
+    private static void loadSMU(int i, SetGettable<SMU> smu) throws Exception {
+
+        String aKey = String.format("SMU%dAddress", i);
+        String dKey = String.format("SMU%dDriver", i);
+
+        if (config.has(aKey) && config.has(dKey)) {
+            StrAddress address = new StrAddress(config.getString(aKey));
+            SMU        d       = (SMU) Class.forName(config.getString(dKey)).getConstructor(InstrumentAddress.class).newInstance(address);
+            smu.set(d);
+        }
     }
 
     /**
