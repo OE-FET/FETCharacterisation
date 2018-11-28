@@ -8,6 +8,8 @@ import JISA.GUI.*;
 import JISA.Util;
 import JISA.VISA.*;
 
+import java.io.IOException;
+
 /**
  * JISA Template Application.
  * <p>
@@ -71,26 +73,17 @@ public class Main extends GUI {
     private static SetGettable<SMU> smu3;
     private static SetGettable<SMU> smu4;
 
-    private static SMU smuSD;
-    private static SMU smuG;
-    private static SMU smu4P1;
-    private static SMU smu4P2;
+    private static SMU smuSD  = null;
+    private static SMU smuG   = null;
+    private static SMU smu4P1 = null;
+    private static SMU smu4P2 = null;
 
+    /**
+     * Runs at start, this is where it all begins.
+     *
+     * @throws Exception Upon something going wrong
+     */
     private static void run(String[] args) throws Exception {
-
-//        GUI.infoAlert("Select Device", "Keithley 2450", "Please select the Keithley 2450");
-//        smu1 = new K2450(GUI.browseVISA());
-//
-//        GUI.infoAlert("Select Device", "Keithley 236", "Please select the Keithley 236");
-//        smu2 = new K236(GUI.browseVISA());
-
-        MCSMU smu = new DummyMCSMU();
-
-        // Treat each channel as its own SMU
-        smuSD = smu.getChannel(0);
-        smuG = smu.getChannel(1);
-        smu4P1 = smu.getChannel(2);
-        smu4P2 = smu.getChannel(3);
 
         // Create results storage
         transferResults = new ResultList("SD Voltage", "Gate Voltage", "Drain Current", "Leakage", "4PP 1", "4PP 2");
@@ -114,6 +107,11 @@ public class Main extends GUI {
 
     }
 
+    /**
+     * Creates the "Transfer Curve" tab in the GUI, for controlling and observing transfer curve measurements.
+     *
+     * @throws Exception Upon something going wrong
+     */
     private static void createTransferSection() throws Exception {
 
         // Create config panels
@@ -158,14 +156,20 @@ public class Main extends GUI {
         delayT.set(DELAY_TIME);
 
         // Add toolbar buttons
-        transferGrid.addToolbarButton("Clear Transfer", transferResults::clear);
         transferGrid.addToolbarButton("Start Transfer", Main::doTransfer);
         transferGrid.addToolbarButton("Stop Experiment", Main::stopExperiment);
+        transferGrid.addToolbarButton("Clear", transferResults::clear);
+
         transferGrid.setNumColumns(2);
         tabs.addTab(transferGrid);
 
     }
 
+    /**
+     * Creates the "Output Curve" tab in the GUI, for controlling and observing output curve measurements.
+     *
+     * @throws Exception Upon something going wrong
+     */
     private static void createOutputSection() throws Exception {
 
         // Create config panels
@@ -202,10 +206,10 @@ public class Main extends GUI {
         Grid  grid  = new Grid("Output Curve", params, config, table, plot);
 
         plot.showMarkers(false);
-
-        grid.addToolbarButton("Clear Output", () -> outputResults.clear());
         grid.addToolbarButton("Start Output", Main::doOutput);
         grid.addToolbarButton("Stop Experiment", Main::stopExperiment);
+        grid.addToolbarButton("Clear", outputResults::clear);
+
         grid.setNumColumns(2);
 
         tabs.addTab(grid);
@@ -213,7 +217,10 @@ public class Main extends GUI {
 
     }
 
-    private static void createConnectionSection() throws Exception {
+    /**
+     * Creates the "Connection Config" tab in the GUI for configuring how to connect to each instrument.
+     */
+    private static void createConnectionSection() {
 
         // Create a ConfigGrid - a grid of Instrument Connection configuration panels
         ConfigGrid grid = new ConfigGrid("Connection Config");
@@ -230,152 +237,47 @@ public class Main extends GUI {
 
     }
 
+    /**
+     * Creates the "Instrument Config" tab in the GUI for configuring which SMU channel should be used for what.
+     */
     private static void createConfigSection() throws Exception {
 
+        // Create panel for Source-Drain configuration
         Fields               sourceDrain = new Fields("Source-Drain SMU");
         SetGettable<Integer> sdSMU       = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sdChannel   = sourceDrain.addIntegerField("Channel Number");
 
-        SetGettable<SMU>[] SMUs = new SetGettable[]{smu1, smu2, smu3, smu4};
+        // Set default value
+        sdSMU.set(0);
 
-        sourceDrain.addButton("Apply", () -> {
+        // Add "Apply" button
+        sourceDrain.addButton("Apply", () -> smuSD = applyButton(sdSMU, sdChannel));
 
-            if (sdSMU.get() < 0 || sdSMU.get() > 3) {
-                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
-                return;
-            }
-
-            SMU smu = SMUs[sdSMU.get()].get();
-
-            if (smu == null) {
-                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
-                return;
-            }
-
-            int channel = sdChannel.get();
-
-            if (smu instanceof MCSMU) {
-
-                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
-                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
-                    return;
-                }
-
-                smuSD = ((MCSMU) smu).getChannel(channel);
-
-            } else {
-                smuSD = smu;
-            }
-
-        });
-
+        // Rinse-and-repeat
         Fields               sourceGate = new Fields("Source-Gate SMU");
         SetGettable<Integer> sgSMU      = sourceGate.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sgChannel  = sourceGate.addIntegerField("Channel Number");
 
+        sgSMU.set(1);
 
-        sourceGate.addButton("Apply", () -> {
+        sourceGate.addButton("Apply", () -> smuG = applyButton(sgSMU, sgChannel));
 
-            if (sgSMU.get() < 0 || sgSMU.get() > 3) {
-                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
-                return;
-            }
-
-            SMU smu = SMUs[sgSMU.get()].get();
-
-            if (smu == null) {
-                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
-                return;
-            }
-
-            int channel = sgChannel.get();
-
-            if (smu instanceof MCSMU) {
-
-                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
-                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
-                    return;
-                }
-
-                smuG = ((MCSMU) smu).getChannel(channel);
-
-            } else {
-                smuG = smu;
-            }
-
-        });
 
         Fields               fourPoint1 = new Fields("Four-Point-Probe 1");
         SetGettable<Integer> fp1SMU     = fourPoint1.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> fp1Channel = fourPoint1.addIntegerField("Channel Number");
 
+        fp1SMU.set(2);
 
-        fourPoint1.addButton("Apply", () -> {
-
-            if (fp1SMU.get() < 0 || fp1SMU.get() > 3) {
-                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
-                return;
-            }
-
-            SMU smu = SMUs[fp1SMU.get()].get();
-
-            if (smu == null) {
-                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
-                return;
-            }
-
-            int channel = fp1Channel.get();
-
-            if (smu instanceof MCSMU) {
-
-                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
-                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
-                    return;
-                }
-
-                smu4P1 = ((MCSMU) smu).getChannel(channel);
-
-            } else {
-                smu4P1 = smu;
-            }
-
-        });
+        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton(fp1SMU, fp1Channel));
 
         Fields               fourPoint2 = new Fields("Four-Point-Probe 2");
         SetGettable<Integer> fp2SMU     = fourPoint2.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> fp2Channel = fourPoint2.addIntegerField("Channel Number");
 
+        fp2SMU.set(3);
 
-        fourPoint2.addButton("Apply", () -> {
-
-            if (fp2SMU.get() < 0 || fp2SMU.get() > 3) {
-                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
-                return;
-            }
-
-            SMU smu = SMUs[fp2SMU.get()].get();
-
-            if (smu == null) {
-                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
-                return;
-            }
-
-            int channel = fp2Channel.get();
-
-            if (smu instanceof MCSMU) {
-
-                if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
-                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
-                    return;
-                }
-
-                smu4P2 = ((MCSMU) smu).getChannel(channel);
-
-            } else {
-                smu4P2 = smu;
-            }
-
-        });
+        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton(fp2SMU, fp2Channel));
 
         Grid grid = new Grid("Instrument Config", sourceDrain, sourceGate, fourPoint1, fourPoint2);
         grid.setNumColumns(2);
@@ -384,26 +286,89 @@ public class Main extends GUI {
 
     }
 
+    private static SMU applyButton(SetGettable<Integer> smuI, SetGettable<Integer> channelI) throws Exception {
+
+        // Store SMUs in array for easy access
+        SetGettable<SMU>[] SMUs = new SetGettable[]{smu1, smu2, smu3, smu4};
+
+        if (smuI.get() < 0 || smuI.get() > 3) {
+            GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+            return null;
+        }
+
+        SMU smu = SMUs[smuI.get()].get();
+
+        if (smu == null) {
+            GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+            return null;
+        }
+
+        int channel = channelI.get();
+
+        if (smu instanceof MCSMU) {
+
+            if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
+                GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                return null;
+            }
+
+            return ((MCSMU) smu).getChannel(channel);
+
+        } else {
+            return smu;
+        }
+    }
+
+    /**
+     * Notifies all experiments to stop running
+     */
     private static void stopExperiment() {
+
+        if (stopFlag) {
+            GUI.errorAlert("Warning", "Nothing to Stop", "There is nothing running to stop.");
+        }
+
         stopFlag = true;
     }
 
+    /**
+     * Performs a transfer curve characterisation, outputting the data to a CSV file.
+     *
+     * @throws Exception Upon something going wrong
+     */
     private static void doTransfer() throws Exception {
 
+        boolean useFourProbe = fourProbeT.get();
+
+        if (smuSD == null || smuG == null) {
+            GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
+            return;
+        }
+
+        if ((smu4P1 == null || smu4P2 == null) && useFourProbe) {
+            GUI.errorAlert("Error", "Four-Probe Not Configured", "To perform four-point-probe measurements, the 4PP SMUs must be configured.");
+            return;
+        }
+
+        // If stopFlag == false then another experiment must be currently running
         if (!stopFlag) {
             GUI.errorAlert("Error", "Experiment Running", "Another experiment is already running.\n\nPlease wait until it has finished.");
             return;
         }
 
+        // Get the value currently in the "Output File" text-box
         String outputFile = fileT.get();
 
+        // Check that it isn't blank
         if (outputFile.trim().equals("")) {
             GUI.errorAlert("Error", "No Output File", "Please select a file to output to.");
             return;
         }
 
+        // Set stopFlag to false so that the rest of the programme knows we're running
         stopFlag = false;
 
+        // Get the values currently entered into the various parameter text-boxes
         double minVG   = minGateT.get();
         double maxVG   = maxGateT.get();
         int    stepsVG = gateStepsT.get();
@@ -414,56 +379,61 @@ public class Main extends GUI {
 
         double currentLimit = limitT.get();
         int    averageCount = countT.get();
-        int    delayMSec    = (int) (delayT.get() * 1000);
+        int    delayMSec    = (int) (delayT.get() * 1000); // Convert to milli-seconds
 
-        boolean useFourProbe = fourProbeT.get();
-
+        // Create arrays of the voltages we are going to use
         double[] gateVoltages = Util.makeLinearArray(minVG, maxVG, stepsVG);
         double[] sdVoltages   = Util.makeLinearArray(minSDV, maxSDV, stepsSDV);
 
+        // Configure the Source-Drain SMU channel
         smuSD.setSource(SMU.Source.VOLTAGE);
         smuSD.setVoltageRange(2.0 * maxSDV);
         smuSD.setVoltageLimit(2.0 * maxSDV);
-        smuSD.useAutoCurrentRange();
+        smuSD.useAutoCurrentRange();            // May need to change this
         smuSD.setCurrentLimit(currentLimit);
         smuSD.setVoltage(minSDV);
         smuSD.setAverageMode(SMU.AMode.MEAN_REPEAT);
         smuSD.setAverageCount(averageCount);
         smuSD.useFourProbe(false);
 
+        // Configure the Gate SMU channel
         smuG.setSource(SMU.Source.VOLTAGE);
         smuG.setVoltageRange(2.0 * maxVG);
         smuG.setVoltageLimit(2.0 * maxVG);
-        smuG.useAutoCurrentRange();
+        smuG.useAutoCurrentRange();            // May need to change this
         smuG.setCurrentLimit(currentLimit);
         smuG.setVoltage(minVG);
         smuG.setAverageMode(SMU.AMode.MEAN_REPEAT);
         smuG.setAverageCount(averageCount);
         smuG.useFourProbe(false);
 
-        smu4P1.setSource(SMU.Source.CURRENT);
-        smu4P1.setVoltageRange(2.0 * maxSDV);
-        smu4P1.setVoltageLimit(2.0 * maxSDV);
-        smu4P1.setAverageMode(SMU.AMode.MEAN_REPEAT);
-        smu4P1.setAverageCount(averageCount);
-        smu4P1.useFourProbe(false);
-        smu4P1.setCurrent(0);
-
-        smu4P2.setSource(SMU.Source.CURRENT);
-        smu4P2.setVoltageRange(2.0 * maxSDV);
-        smu4P2.setVoltageLimit(2.0 * maxSDV);
-        smu4P2.setAverageMode(SMU.AMode.MEAN_REPEAT);
-        smu4P2.setAverageCount(averageCount);
-        smu4P2.useFourProbe(false);
-        smu4P2.setCurrent(0);
-
-        smuSD.turnOn();
-        smuG.turnOn();
-
         if (useFourProbe) {
+            // Configure the 4PP-1 SMU channel to act as a voltmeter
+            smu4P1.setSource(SMU.Source.CURRENT);
+            smu4P1.setVoltageRange(2.0 * maxSDV);
+            smu4P1.setVoltageLimit(2.0 * maxSDV);
+            smu4P1.setAverageMode(SMU.AMode.MEAN_REPEAT);
+            smu4P1.setAverageCount(averageCount);
+            smu4P1.useFourProbe(false);
+            smu4P1.setCurrent(0);
+
+            // Configure the 4PP-2 SMU channel to act as a voltmeter
+            smu4P2.setSource(SMU.Source.CURRENT);
+            smu4P2.setVoltageRange(2.0 * maxSDV);
+            smu4P2.setVoltageLimit(2.0 * maxSDV);
+            smu4P2.setAverageMode(SMU.AMode.MEAN_REPEAT);
+            smu4P2.setAverageCount(averageCount);
+            smu4P2.useFourProbe(false);
+            smu4P2.setCurrent(0);
+
+            // Enable voltage probes (SMU channels)
             smu4P1.turnOn();
             smu4P2.turnOn();
         }
+
+        // Enable the SMU channels
+        smuSD.turnOn();
+        smuG.turnOn();
 
         mainLoop:
         for (double VSD : sdVoltages) {
@@ -473,6 +443,8 @@ public class Main extends GUI {
             for (double VG : gateVoltages) {
 
                 smuG.setVoltage(VG);
+
+                // Wait our delay time before measuring
                 Thread.sleep(delayMSec);
 
                 transferResults.addData(
@@ -484,26 +456,43 @@ public class Main extends GUI {
                         useFourProbe ? smu4P2.getVoltage() : 0
                 );
 
+                // If the stopFlag changes to true, then someone has pressed the Stop button
                 if (stopFlag) {
-                    break mainLoop;
+                    break mainLoop; // Break out of mainLoop:
                 }
 
             }
 
         }
 
+        // Make sure all channels are turned back off
         smuSD.turnOff();
         smuG.turnOff();
         smu4P1.turnOff();
         smu4P2.turnOff();
 
+        // Output our data as a CSV file
         transferResults.output(outputFile);
+
+        // Reset the stopFlat
         stopFlag = true;
 
+        // Tell the user we're done
+        GUI.infoAlert("Complete", "Measurement Complete", "Transfer curve completed, data saved to:\n" + outputFile, 600);
 
     }
 
+    /**
+     * Performs an output curve characterisation, outputting the data to a CSV file.
+     *
+     * @throws Exception Upon something going wrong
+     */
     private static void doOutput() throws Exception {
+
+        if (smuSD == null || smuG == null) {
+            GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
+            return;
+        }
 
         if (!stopFlag) {
             GUI.errorAlert("Error", "Experiment Running", "Another experiment is already running.\n\nPlease wait until it has finished.");
@@ -588,6 +577,8 @@ public class Main extends GUI {
         outputResults.output(outputFile);
         stopFlag = true;
 
+        GUI.infoAlert("Complete", "Measurement Complete", "Output curve completed, data saved to:\n" + outputFile, 600);
+
     }
 
     public static void main(String[] args) {
@@ -595,6 +586,7 @@ public class Main extends GUI {
         try {
             run(args);
         } catch (Exception e) {
+            GUI.errorAlert("Exception", "Exception Thrown", e.getMessage());
             Util.exceptionHandler(e);
         }
 
