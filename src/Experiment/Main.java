@@ -22,26 +22,24 @@ import java.nio.file.Paths;
  */
 public class Main extends GUI {
 
-    private static final double MIN_SD_VOLTAGE   = -5.0;
-    private static final double MAX_SD_VOLTAGE   = -60;
-    private static final int    STEPS_SD_VOLTAGE = 2;
-
-    private static final double MIN_G_VOLTAGE   = 0;
-    private static final double MAX_G_VOLTAGE   = -60;
-    private static final int    STEPS_G_VOLTAGE = 61;
-
-    private static final double CURRENT_LIMIT = 1e-3;
-    private static final int    AVERAGE_COUNT = 25;
-    private static final double DELAY_TIME    = 0.5;
-
-    private static final double MIN_SD_VOLTAGE_OUTPUT   = 0.0;
-    private static final double MAX_SD_VOLTAGE_OUTPUT   = -60.0;
-    private static final int    STEPS_SD_VOLTAGE_OUTPUT = 61;
-
+    // ==== DEFAULT VALUES =============================================================================================
+    private static final double MIN_SD_VOLTAGE            = -5.0;
+    private static final double MAX_SD_VOLTAGE            = -60;
+    private static final int    STEPS_SD_VOLTAGE          = 2;
+    private static final double MIN_G_VOLTAGE             = 0;
+    private static final double MAX_G_VOLTAGE             = -60;
+    private static final int    STEPS_G_VOLTAGE           = 61;
+    private static final double CURRENT_LIMIT             = 1e-3;
+    private static final int    AVERAGE_COUNT             = 25;
+    private static final double DELAY_TIME                = 0.5;
+    private static final double MIN_SD_VOLTAGE_OUTPUT     = 0.0;
+    private static final double MAX_SD_VOLTAGE_OUTPUT     = -60.0;
+    private static final int    STEPS_SD_VOLTAGE_OUTPUT   = 61;
     private static final double MIN_GATE_VOLTAGE_OUTPUT   = 0.0;
     private static final double MAX_GATE_VOLTAGE_OUTPUT   = -60.0;
     private static final int    STEPS_GATE_VOLTAGE_OUTPUT = 7;
 
+    // ==== Transfer Curve Fields and Results ==========================================================================
     private static SetGettable<Double>  minGateT;
     private static SetGettable<Double>  maxGateT;
     private static SetGettable<Integer> gateStepsT;
@@ -55,6 +53,7 @@ public class Main extends GUI {
     private static SetGettable<Boolean> fourProbeT;
     private static ResultList           transferResults;
 
+    // ==== Output Curve Fields and Results ============================================================================
     private static SetGettable<Double>  minGateO;
     private static SetGettable<Double>  maxGateO;
     private static SetGettable<Integer> gateStepsO;
@@ -67,20 +66,24 @@ public class Main extends GUI {
     private static SetGettable<String>  fileO;
     private static ResultList           outputResults;
 
+    // ==== Tabs GUI (main window) =====================================================================================
     private static Tabs tabs;
 
     private static boolean stopFlag = true;
 
+    // ==== Connection Config Handles ==================================================================================
     private static InstrumentConfig<SMU> smu1;
     private static InstrumentConfig<SMU> smu2;
     private static InstrumentConfig<SMU> smu3;
     private static InstrumentConfig<SMU> smu4;
 
+    // ==== SMUs =======================================================================================================
     private static SMU smuSD  = null;
     private static SMU smuG   = null;
     private static SMU smu4P1 = null;
     private static SMU smu4P2 = null;
 
+    // ==== Config Storage and Set-Up ==================================================================================
     private static ConfigStore config;
     private static Runnable    doConfig;
 
@@ -244,6 +247,7 @@ public class Main extends GUI {
         // Add this section to the tabs
         tabs.addTab(grid);
 
+        // Attempt to connect with whatever config has been loaded from our config storage
         grid.connectAll();
 
     }
@@ -258,6 +262,7 @@ public class Main extends GUI {
         SetGettable<Integer> sdSMU       = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sdChannel   = sourceDrain.addIntegerField("Channel Number");
 
+        // If the relevant config entries exist in our config storage, then load them in
         if (config.has("SDSMU") && config.has("SDCHN")) {
             sdSMU.set(config.getInt("SDSMU"));
             sdChannel.set(config.getInt("SDCHN"));
@@ -317,6 +322,7 @@ public class Main extends GUI {
 
         tabs.addTab(grid);
 
+        // Keep this for later when we want to apply all at once
         doConfig = () -> {
 
             try {
@@ -340,6 +346,7 @@ public class Main extends GUI {
         // Store SMUs in array for easy access
         InstrumentConfig[] SMUs = new InstrumentConfig[]{smu1, smu2, smu3, smu4};
 
+        // If the index is not between 0 and 3, then something's wrong (we only have four configurable SMUs)
         if (smuI.get() < 0 || smuI.get() > 3) {
             if (message) {
                 GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
@@ -347,8 +354,10 @@ public class Main extends GUI {
             return null;
         }
 
+        // Get the SMU that the user has selected
         SMU smu = (SMU) SMUs[smuI.get()].get();
 
+        // It will be null if it has not been successfully connected yet
         if (smu == null) {
             if (message) {
                 GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
@@ -356,8 +365,10 @@ public class Main extends GUI {
             return null;
         }
 
+        // Get the channel number the user has specified
         int channel = channelI.get();
 
+        // If it's a multi-channel SMU then we need to use the channel to number to select the correct channel
         if (smu instanceof MCSMU) {
 
             if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
@@ -393,15 +404,19 @@ public class Main extends GUI {
      */
     private static void doTransfer() throws Exception {
 
+        // Make sure we have applied our config before running
         doConfig.run();
 
+        // Do we want to use four-point-probe measurements?
         boolean useFourProbe = fourProbeT.get();
 
+        // Check that the source-drain and source-gate SMUs are connected and configured
         if (smuSD == null || smuG == null) {
             GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
             return;
         }
 
+        // If we are using four-point-probe measurements, make sure the two 4PP SMUs are connected and configured
         if ((smu4P1 == null || smu4P2 == null) && useFourProbe) {
             GUI.errorAlert("Error", "Four-Probe Not Configured", "To perform four-point-probe measurements, the 4PP SMUs must be configured.");
             return;
