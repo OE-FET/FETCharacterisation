@@ -104,7 +104,7 @@ public class Main extends GUI {
         outputResults = new ResultList("SD Voltage", "Gate Voltage", "Drain Current", "Leakage");
         outputResults.setUnits("V", "V", "A", "A");
 
-        // Create the tabs
+        // Create the tabs which we shall use as the main window (ie everything else gets added to this one way or another)
         tabs = new Tabs("FET Characterisation");
 
         // Create each section of our GUI
@@ -259,6 +259,9 @@ public class Main extends GUI {
 
         // Create panel for Source-Drain configuration
         Fields               sourceDrain = new Fields("Source-Drain SMU");
+
+        // Adding a choice box with the options of "SMU1", "SMU2", "SMU3", and "SMU4". Will return an integer when queried
+        // representing which option was chosen (0 for SMU1, 3 for SMU4 etc).
         SetGettable<Integer> sdSMU       = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sdChannel   = sourceDrain.addIntegerField("Channel Number");
 
@@ -507,6 +510,8 @@ public class Main extends GUI {
         smuSD.turnOn();
         smuG.turnOn();
 
+        // mainLoop: is a "label", marking this for loop as being our "mainLoop" so that we can tell Java to break out of
+        // this loop when needed
         mainLoop:
         for (double VSD : sdVoltages) {
 
@@ -561,6 +566,7 @@ public class Main extends GUI {
      */
     private static void doOutput() throws Exception {
 
+        // Run that config code we stored previously
         doConfig.run();
 
         if (smuSD == null || smuG == null) {
