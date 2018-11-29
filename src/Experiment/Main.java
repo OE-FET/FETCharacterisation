@@ -257,37 +257,59 @@ public class Main extends GUI {
         SetGettable<Integer> sdSMU       = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sdChannel   = sourceDrain.addIntegerField("Channel Number");
 
-        // Set default value
-        sdSMU.set(0);
+        if (config.has("SDSMU") && config.has("SDCHN")) {
+            sdSMU.set(config.getInt("SDSMU"));
+            sdChannel.set(config.getInt("SDCHN"));
+        } else {
+            sdSMU.set(0);
+            sdChannel.set(0);
+        }
 
         // Add "Apply" button
-        sourceDrain.addButton("Apply", () -> smuSD = applyButton(sdSMU, sdChannel));
+        sourceDrain.addButton("Apply", () -> smuSD = applyButton("SD", sdSMU, sdChannel));
 
         // Rinse-and-repeat
         Fields               sourceGate = new Fields("Source-Gate SMU");
         SetGettable<Integer> sgSMU      = sourceGate.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sgChannel  = sourceGate.addIntegerField("Channel Number");
 
-        sgSMU.set(1);
+        if (config.has("SGSMU") && config.has("SGCHN")) {
+            sgSMU.set(config.getInt("SGSMU"));
+            sgChannel.set(config.getInt("SGCHN"));
+        } else {
+            sgSMU.set(1);
+            sgChannel.set(0);
+        }
 
-        sourceGate.addButton("Apply", () -> smuG = applyButton(sgSMU, sgChannel));
-
+        sourceGate.addButton("Apply", () -> smuG = applyButton("SG", sgSMU, sgChannel));
 
         Fields               fourPoint1 = new Fields("Four-Point-Probe 1");
         SetGettable<Integer> fp1SMU     = fourPoint1.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> fp1Channel = fourPoint1.addIntegerField("Channel Number");
 
-        fp1SMU.set(2);
+        if (config.has("FP1SMU") && config.has("FP1CHN")) {
+            fp1SMU.set(config.getInt("FP1SMU"));
+            fp1Channel.set(config.getInt("FP1CHN"));
+        } else {
+            fp1SMU.set(2);
+            fp1Channel.set(0);
+        }
 
-        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton(fp1SMU, fp1Channel));
+        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton("FP1", fp1SMU, fp1Channel));
 
         Fields               fourPoint2 = new Fields("Four-Point-Probe 2");
         SetGettable<Integer> fp2SMU     = fourPoint2.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> fp2Channel = fourPoint2.addIntegerField("Channel Number");
 
-        fp2SMU.set(3);
+        if (config.has("FP2SMU") && config.has("FP2CHN")) {
+            fp2SMU.set(config.getInt("FP2SMU"));
+            fp2Channel.set(config.getInt("FP2CHN"));
+        } else {
+            fp2SMU.set(3);
+            fp2Channel.set(0);
+        }
 
-        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton(fp2SMU, fp2Channel));
+        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton("FP2", fp2SMU, fp2Channel));
 
         Grid grid = new Grid("Instrument Config", sourceDrain, sourceGate, fourPoint1, fourPoint2);
         grid.setNumColumns(2);
@@ -296,7 +318,10 @@ public class Main extends GUI {
 
     }
 
-    private static SMU applyButton(SetGettable<Integer> smuI, SetGettable<Integer> channelI) throws Exception {
+    private static SMU applyButton(String tag, SetGettable<Integer> smuI, SetGettable<Integer> channelI) throws Exception {
+
+        config.set(tag + "SMU", smuI.get());
+        config.set(tag + "CHN", channelI.get());
 
         // Store SMUs in array for easy access
         InstrumentConfig[] SMUs = new InstrumentConfig[]{smu1, smu2, smu3, smu4};
