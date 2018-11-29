@@ -8,7 +8,10 @@ import JISA.GUI.*;
 import JISA.Util;
 import JISA.VISA.*;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 /**
  * JISA Template Application.
@@ -68,10 +71,10 @@ public class Main extends GUI {
 
     private static boolean stopFlag = true;
 
-    private static SetGettable<SMU> smu1;
-    private static SetGettable<SMU> smu2;
-    private static SetGettable<SMU> smu3;
-    private static SetGettable<SMU> smu4;
+    private static InstrumentConfig<SMU> smu1;
+    private static InstrumentConfig<SMU> smu2;
+    private static InstrumentConfig<SMU> smu3;
+    private static InstrumentConfig<SMU> smu4;
 
     private static SMU smuSD  = null;
     private static SMU smuG   = null;
@@ -101,10 +104,10 @@ public class Main extends GUI {
         tabs = new Tabs("FET Characterisation");
 
         // Create each section of our GUI
-        createTransferSection();
-        createOutputSection();
         createConnectionSection();
         createConfigSection();
+        createTransferSection();
+        createOutputSection();
 
         // Make sure the window is maximised and show it
         tabs.setMaximised(true);
@@ -228,7 +231,7 @@ public class Main extends GUI {
     private static void createConnectionSection() throws Exception {
 
         // Create a ConfigGrid - a grid of Instrument Connection configuration panels
-        ConfigGrid grid = new ConfigGrid("Connection Config");
+        ConfigGrid grid = new ConfigGrid("Connection Config", config);
         grid.setNumColumns(2);
 
         // Add instruments to configure, returns GetSettable objects for the relevant instrument objects
@@ -237,54 +240,11 @@ public class Main extends GUI {
         smu3 = grid.addInstrument("SMU 3", SMU.class);
         smu4 = grid.addInstrument("SMU 4", SMU.class);
 
-        loadSMU(1, smu1);
-        loadSMU(2, smu2);
-        loadSMU(3, smu3);
-        loadSMU(4, smu4);
-
-        grid.connectAll();
-
-        grid.addToolbarButton("Save Config", () -> {
-
-            if (smu1.get() != null) {
-                config.set("SMU1Address", smu1.get().getAddress().getVISAAddress());
-                config.set("SMU1Driver", smu1.get().getClass().getName());
-            }
-
-            if (smu2.get() != null) {
-                config.set("SMU2Address", smu2.get().getAddress().getVISAAddress());
-                config.set("SMU2Driver", smu2.get().getClass().getName());
-            }
-
-            if (smu3.get() != null) {
-                config.set("SMU3Address", smu3.get().getAddress().getVISAAddress());
-                config.set("SMU3Driver", smu3.get().getClass().getName());
-            }
-
-            if (smu4.get() != null) {
-                config.set("SMU4Address", smu4.get().getAddress().getVISAAddress());
-                config.set("SMU4Driver", smu4.get().getClass().getName());
-            }
-
-            config.save();
-
-        });
-
         // Add this section to the tabs
         tabs.addTab(grid);
 
-    }
+        grid.connectAll();
 
-    private static void loadSMU(int i, SetGettable<SMU> smu) throws Exception {
-
-        String aKey = String.format("SMU%dAddress", i);
-        String dKey = String.format("SMU%dDriver", i);
-
-        if (config.has(aKey) && config.has(dKey)) {
-            StrAddress address = new StrAddress(config.getString(aKey));
-            SMU        d       = (SMU) Class.forName(config.getString(dKey)).getConstructor(InstrumentAddress.class).newInstance(address);
-            smu.set(d);
-        }
     }
 
     /**
@@ -339,14 +299,14 @@ public class Main extends GUI {
     private static SMU applyButton(SetGettable<Integer> smuI, SetGettable<Integer> channelI) throws Exception {
 
         // Store SMUs in array for easy access
-        SetGettable<SMU>[] SMUs = new SetGettable[]{smu1, smu2, smu3, smu4};
+        InstrumentConfig[] SMUs = new InstrumentConfig[]{smu1, smu2, smu3, smu4};
 
         if (smuI.get() < 0 || smuI.get() > 3) {
             GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
             return null;
         }
 
-        SMU smu = SMUs[smuI.get()].get();
+        SMU smu = (SMU) SMUs[smuI.get()].get();
 
         if (smu == null) {
             GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
