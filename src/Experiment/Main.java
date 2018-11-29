@@ -82,6 +82,7 @@ public class Main extends GUI {
     private static SMU smu4P2 = null;
 
     private static ConfigStore config;
+    private static Runnable    doConfig;
 
     /**
      * Runs at start, this is where it all begins.
@@ -266,7 +267,7 @@ public class Main extends GUI {
         }
 
         // Add "Apply" button
-        sourceDrain.addButton("Apply", () -> smuSD = applyButton("SD", sdSMU, sdChannel));
+        sourceDrain.addButton("Apply", () -> smuSD = applyButton("SD", sdSMU, sdChannel, true));
 
         // Rinse-and-repeat
         Fields               sourceGate = new Fields("Source-Gate SMU");
@@ -281,7 +282,7 @@ public class Main extends GUI {
             sgChannel.set(0);
         }
 
-        sourceGate.addButton("Apply", () -> smuG = applyButton("SG", sgSMU, sgChannel));
+        sourceGate.addButton("Apply", () -> smuG = applyButton("SG", sgSMU, sgChannel, true));
 
         Fields               fourPoint1 = new Fields("Four-Point-Probe 1");
         SetGettable<Integer> fp1SMU     = fourPoint1.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
@@ -295,7 +296,7 @@ public class Main extends GUI {
             fp1Channel.set(0);
         }
 
-        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton("FP1", fp1SMU, fp1Channel));
+        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton("FP1", fp1SMU, fp1Channel, true));
 
         Fields               fourPoint2 = new Fields("Four-Point-Probe 2");
         SetGettable<Integer> fp2SMU     = fourPoint2.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
@@ -309,16 +310,29 @@ public class Main extends GUI {
             fp2Channel.set(0);
         }
 
-        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton("FP2", fp2SMU, fp2Channel));
+        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton("FP2", fp2SMU, fp2Channel, true));
 
         Grid grid = new Grid("Instrument Config", sourceDrain, sourceGate, fourPoint1, fourPoint2);
         grid.setNumColumns(2);
 
         tabs.addTab(grid);
 
+        doConfig = () -> {
+
+            try {
+                smuSD = applyButton("SD", sdSMU, sdChannel, false);
+                smuG = applyButton("SG", sgSMU, sgChannel, false);
+                smu4P1 = applyButton("FP1", fp1SMU, fp1Channel, false);
+                smu4P2 = applyButton("FP2", fp2SMU, fp2Channel, false);
+            } catch (Exception e) {
+                System.err.println(e.getMessage());
+            }
+
+        };
+
     }
 
-    private static SMU applyButton(String tag, SetGettable<Integer> smuI, SetGettable<Integer> channelI) throws Exception {
+    private static SMU applyButton(String tag, SetGettable<Integer> smuI, SetGettable<Integer> channelI, boolean message) throws Exception {
 
         config.set(tag + "SMU", smuI.get());
         config.set(tag + "CHN", channelI.get());
@@ -327,14 +341,18 @@ public class Main extends GUI {
         InstrumentConfig[] SMUs = new InstrumentConfig[]{smu1, smu2, smu3, smu4};
 
         if (smuI.get() < 0 || smuI.get() > 3) {
-            GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+            if (message) {
+                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+            }
             return null;
         }
 
         SMU smu = (SMU) SMUs[smuI.get()].get();
 
         if (smu == null) {
-            GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+            if (message) {
+                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+            }
             return null;
         }
 
@@ -343,7 +361,9 @@ public class Main extends GUI {
         if (smu instanceof MCSMU) {
 
             if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
-                GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                if (message) {
+                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                }
                 return null;
             }
 
@@ -372,6 +392,8 @@ public class Main extends GUI {
      * @throws Exception Upon something going wrong
      */
     private static void doTransfer() throws Exception {
+
+        doConfig.run();
 
         boolean useFourProbe = fourProbeT.get();
 
@@ -523,6 +545,8 @@ public class Main extends GUI {
      * @throws Exception Upon something going wrong
      */
     private static void doOutput() throws Exception {
+
+        doConfig.run();
 
         if (smuSD == null || smuG == null) {
             GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
