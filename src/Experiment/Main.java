@@ -8,7 +8,10 @@ import JISA.GUI.*;
 import JISA.Util;
 import JISA.VISA.*;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 /**
  * JISA Template Application.
@@ -19,26 +22,24 @@ import java.io.IOException;
  */
 public class Main extends GUI {
 
-    private static final double MIN_SD_VOLTAGE   = -5.0;
-    private static final double MAX_SD_VOLTAGE   = -60;
-    private static final int    STEPS_SD_VOLTAGE = 2;
-
-    private static final double MIN_G_VOLTAGE   = 0;
-    private static final double MAX_G_VOLTAGE   = -60;
-    private static final int    STEPS_G_VOLTAGE = 61;
-
-    private static final double CURRENT_LIMIT = 1e-3;
-    private static final int    AVERAGE_COUNT = 25;
-    private static final double DELAY_TIME    = 0.5;
-
-    private static final double MIN_SD_VOLTAGE_OUTPUT   = 0.0;
-    private static final double MAX_SD_VOLTAGE_OUTPUT   = -60.0;
-    private static final int    STEPS_SD_VOLTAGE_OUTPUT = 61;
-
+    // ==== DEFAULT VALUES =============================================================================================
+    private static final double MIN_SD_VOLTAGE            = -5.0;
+    private static final double MAX_SD_VOLTAGE            = -60;
+    private static final int    STEPS_SD_VOLTAGE          = 2;
+    private static final double MIN_G_VOLTAGE             = 0;
+    private static final double MAX_G_VOLTAGE             = -60;
+    private static final int    STEPS_G_VOLTAGE           = 61;
+    private static final double CURRENT_LIMIT             = 1e-3;
+    private static final int    AVERAGE_COUNT             = 25;
+    private static final double DELAY_TIME                = 0.5;
+    private static final double MIN_SD_VOLTAGE_OUTPUT     = 0.0;
+    private static final double MAX_SD_VOLTAGE_OUTPUT     = -60.0;
+    private static final int    STEPS_SD_VOLTAGE_OUTPUT   = 61;
     private static final double MIN_GATE_VOLTAGE_OUTPUT   = 0.0;
     private static final double MAX_GATE_VOLTAGE_OUTPUT   = -60.0;
     private static final int    STEPS_GATE_VOLTAGE_OUTPUT = 7;
 
+    // ==== Transfer Curve Fields and Results ==========================================================================
     private static SetGettable<Double>  minGateT;
     private static SetGettable<Double>  maxGateT;
     private static SetGettable<Integer> gateStepsT;
@@ -52,6 +53,7 @@ public class Main extends GUI {
     private static SetGettable<Boolean> fourProbeT;
     private static ResultList           transferResults;
 
+    // ==== Output Curve Fields and Results ============================================================================
     private static SetGettable<Double>  minGateO;
     private static SetGettable<Double>  maxGateO;
     private static SetGettable<Integer> gateStepsO;
@@ -64,22 +66,29 @@ public class Main extends GUI {
     private static SetGettable<String>  fileO;
     private static ResultList           outputResults;
 
+    // ==== Tabs GUI (main window) =====================================================================================
     private static Tabs tabs;
 
     private static boolean stopFlag = true;
     private static boolean tempFlag = false;
     private static ResultList log;
 
-    private static SetGettable<SMU> smu1;
-    private static SetGettable<SMU> smu2;
-    private static SetGettable<SMU> smu3;
-    private static SetGettable<SMU> smu4;
+    // ==== Connection Config Handles ==================================================================================
+    private static InstrumentConfig<SMU> smu1;
+    private static InstrumentConfig<SMU> smu2;
+    private static InstrumentConfig<SMU> smu3;
+    private static InstrumentConfig<SMU> smu4;
 
+    // ==== SMUs =======================================================================================================
     private static SMU smuSD  = null;
     private static SMU smuG   = null;
     private static SMU smu4P1 = null;
     private static SMU smu4P2 = null;
     private static TController temp = null;
+
+    // ==== Config Storage and Set-Up ==================================================================================
+    private static ConfigStore config;
+    private static Runnable    doConfig;
 
     /**
      * Runs at start, this is where it all begins.
@@ -87,7 +96,9 @@ public class Main extends GUI {
      * @throws Exception Upon something going wrong
      */
     private static void run(String[] args) throws Exception {
-
+      
+        // Create or load up config file
+        config = new ConfigStore("FETCharacterisation");
         temp = new ITC503(new GPIBAddress(0,24));
 
         // Create results storage
@@ -97,14 +108,14 @@ public class Main extends GUI {
         outputResults = new ResultList("SD Voltage", "Gate Voltage", "Drain Current", "Leakage");
         outputResults.setUnits("V", "V", "A", "A");
 
-        // Create the tabs
+        // Create the tabs which we shall use as the main window (ie everything else gets added to this one way or another)
         tabs = new Tabs("FET Characterisation");
 
         // Create each section of our GUI
-        createTransferSection();
-        createOutputSection();
         createConnectionSection();
         createConfigSection();
+        createTransferSection();
+        createOutputSection();
         createTempLogSection();
 
         // Make sure the window is maximised and show it
@@ -284,10 +295,10 @@ public class Main extends GUI {
     /**
      * Creates the "Connection Config" tab in the GUI for configuring how to connect to each instrument.
      */
-    private static void createConnectionSection() {
+    private static void createConnectionSection() throws Exception {
 
         // Create a ConfigGrid - a grid of Instrument Connection configuration panels
-        ConfigGrid grid = new ConfigGrid("Connection Config");
+        ConfigGrid grid = new ConfigGrid("Connection Config", config);
         grid.setNumColumns(2);
 
         // Add instruments to configure, returns GetSettable objects for the relevant instrument objects
@@ -299,6 +310,9 @@ public class Main extends GUI {
         // Add this section to the tabs
         tabs.addTab(grid);
 
+        // Attempt to connect with whatever config has been loaded from our config storage
+        grid.connectAll();
+
     }
 
     /**
@@ -308,71 +322,125 @@ public class Main extends GUI {
 
         // Create panel for Source-Drain configuration
         Fields               sourceDrain = new Fields("Source-Drain SMU");
+
+        // Adding a choice box with the options of "SMU1", "SMU2", "SMU3", and "SMU4". Will return an integer when queried
+        // representing which option was chosen (0 for SMU1, 3 for SMU4 etc).
         SetGettable<Integer> sdSMU       = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sdChannel   = sourceDrain.addIntegerField("Channel Number");
 
-        // Set default value
-        sdSMU.set(0);
+        // If the relevant config entries exist in our config storage, then load them in
+        if (config.has("SDSMU") && config.has("SDCHN")) {
+            sdSMU.set(config.getInt("SDSMU"));
+            sdChannel.set(config.getInt("SDCHN"));
+        } else {
+            sdSMU.set(0);
+            sdChannel.set(0);
+        }
 
         // Add "Apply" button
-        sourceDrain.addButton("Apply", () -> smuSD = applyButton(sdSMU, sdChannel));
+        sourceDrain.addButton("Apply", () -> smuSD = applyButton("SD", sdSMU, sdChannel, true));
 
         // Rinse-and-repeat
         Fields               sourceGate = new Fields("Source-Gate SMU");
         SetGettable<Integer> sgSMU      = sourceGate.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> sgChannel  = sourceGate.addIntegerField("Channel Number");
 
-        sgSMU.set(1);
+        if (config.has("SGSMU") && config.has("SGCHN")) {
+            sgSMU.set(config.getInt("SGSMU"));
+            sgChannel.set(config.getInt("SGCHN"));
+        } else {
+            sgSMU.set(1);
+            sgChannel.set(0);
+        }
 
-        sourceGate.addButton("Apply", () -> smuG = applyButton(sgSMU, sgChannel));
-
+        sourceGate.addButton("Apply", () -> smuG = applyButton("SG", sgSMU, sgChannel, true));
 
         Fields               fourPoint1 = new Fields("Four-Point-Probe 1");
         SetGettable<Integer> fp1SMU     = fourPoint1.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> fp1Channel = fourPoint1.addIntegerField("Channel Number");
 
-        fp1SMU.set(2);
+        if (config.has("FP1SMU") && config.has("FP1CHN")) {
+            fp1SMU.set(config.getInt("FP1SMU"));
+            fp1Channel.set(config.getInt("FP1CHN"));
+        } else {
+            fp1SMU.set(2);
+            fp1Channel.set(0);
+        }
 
-        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton(fp1SMU, fp1Channel));
+        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton("FP1", fp1SMU, fp1Channel, true));
 
         Fields               fourPoint2 = new Fields("Four-Point-Probe 2");
         SetGettable<Integer> fp2SMU     = fourPoint2.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
         SetGettable<Integer> fp2Channel = fourPoint2.addIntegerField("Channel Number");
 
-        fp2SMU.set(3);
+        if (config.has("FP2SMU") && config.has("FP2CHN")) {
+            fp2SMU.set(config.getInt("FP2SMU"));
+            fp2Channel.set(config.getInt("FP2CHN"));
+        } else {
+            fp2SMU.set(3);
+            fp2Channel.set(0);
+        }
 
-        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton(fp2SMU, fp2Channel));
+        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton("FP2", fp2SMU, fp2Channel, true));
 
         Grid grid = new Grid("Instrument Config", sourceDrain, sourceGate, fourPoint1, fourPoint2);
         grid.setNumColumns(2);
 
         tabs.addTab(grid);
 
+        // Keep this for later when we want to apply all at once
+        doConfig = () -> {
+
+            try {
+                smuSD = applyButton("SD", sdSMU, sdChannel, false);
+                smuG = applyButton("SG", sgSMU, sgChannel, false);
+                smu4P1 = applyButton("FP1", fp1SMU, fp1Channel, false);
+                smu4P2 = applyButton("FP2", fp2SMU, fp2Channel, false);
+            } catch (Exception e) {
+                System.err.println(e.getMessage());
+            }
+
+        };
+
     }
 
-    private static SMU applyButton(SetGettable<Integer> smuI, SetGettable<Integer> channelI) throws Exception {
+    private static SMU applyButton(String tag, SetGettable<Integer> smuI, SetGettable<Integer> channelI, boolean message) throws Exception {
+
+        config.set(tag + "SMU", smuI.get());
+        config.set(tag + "CHN", channelI.get());
 
         // Store SMUs in array for easy access
-        SetGettable<SMU>[] SMUs = new SetGettable[]{smu1, smu2, smu3, smu4};
+        InstrumentConfig[] SMUs = new InstrumentConfig[]{smu1, smu2, smu3, smu4};
 
+        // If the index is not between 0 and 3, then something's wrong (we only have four configurable SMUs)
         if (smuI.get() < 0 || smuI.get() > 3) {
-            GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+            if (message) {
+                GUI.errorAlert("Error", "Select SMU", "Please select an SMU.");
+            }
             return null;
         }
 
-        SMU smu = SMUs[smuI.get()].get();
+        // Get the SMU that the user has selected
+        SMU smu = (SMU) SMUs[smuI.get()].get();
 
+        // It will be null if it has not been successfully connected yet
         if (smu == null) {
-            GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+            if (message) {
+                GUI.errorAlert("Error", "Not Connected", "That SMU is not connected!");
+            }
             return null;
         }
 
+        // Get the channel number the user has specified
         int channel = channelI.get();
 
+        // If it's a multi-channel SMU then we need to use the channel to number to select the correct channel
         if (smu instanceof MCSMU) {
 
             if (channel >= ((MCSMU) smu).getNumChannels() || channel < 0) {
-                GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                if (message) {
+                    GUI.errorAlert("Error", "Invalid Channel", "That SMU does not have that channel.");
+                }
                 return null;
             }
 
@@ -402,13 +470,19 @@ public class Main extends GUI {
      */
     private static void doTransfer() throws Exception {
 
+        // Make sure we have applied our config before running
+        doConfig.run();
+
+        // Do we want to use four-point-probe measurements?
         boolean useFourProbe = fourProbeT.get();
 
+        // Check that the source-drain and source-gate SMUs are connected and configured
         if (smuSD == null || smuG == null) {
             GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
             return;
         }
 
+        // If we are using four-point-probe measurements, make sure the two 4PP SMUs are connected and configured
         if ((smu4P1 == null || smu4P2 == null) && useFourProbe) {
             GUI.errorAlert("Error", "Four-Probe Not Configured", "To perform four-point-probe measurements, the 4PP SMUs must be configured.");
             return;
@@ -499,6 +573,8 @@ public class Main extends GUI {
         smuSD.turnOn();
         smuG.turnOn();
 
+        // mainLoop: is a "label", marking this for loop as being our "mainLoop" so that we can tell Java to break out of
+        // this loop when needed
         mainLoop:
         for (double VSD : sdVoltages) {
 
@@ -552,6 +628,9 @@ public class Main extends GUI {
      * @throws Exception Upon something going wrong
      */
     private static void doOutput() throws Exception {
+
+        // Run that config code we stored previously
+        doConfig.run();
 
         if (smuSD == null || smuG == null) {
             GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
