@@ -67,8 +67,6 @@ public class Main extends GUI {
     private static Tabs tabs;
 
     private static boolean stopFlag = true;
-    private static boolean tempFlag = false;
-    private static ResultList log;
 
     private static SetGettable<SMU> smu1;
     private static SetGettable<SMU> smu2;
@@ -79,7 +77,6 @@ public class Main extends GUI {
     private static SMU smuG   = null;
     private static SMU smu4P1 = null;
     private static SMU smu4P2 = null;
-    private static TController temp = null;
 
     /**
      * Runs at start, this is where it all begins.
@@ -88,7 +85,12 @@ public class Main extends GUI {
      */
     private static void run(String[] args) throws Exception {
 
+<<<<<<< HEAD
         temp = new ITC503(new GPIBAddress(0,24));
+=======
+        // Create or load up config file
+        config = new ConfigStore("FETCharacterisation");
+>>>>>>> parent of 05f0042... Merge branch 'Leszek' into master
 
         // Create results storage
         transferResults = new ResultList("SD Voltage", "Gate Voltage", "Drain Current", "Leakage", "4PP 1", "4PP 2");
@@ -103,72 +105,17 @@ public class Main extends GUI {
         // Create each section of our GUI
         createTransferSection();
         createOutputSection();
+<<<<<<< HEAD
         createConnectionSection();
         createConfigSection();
         createTempLogSection();
+=======
+>>>>>>> parent of 05f0042... Merge branch 'Leszek' into master
 
         // Make sure the window is maximised and show it
         tabs.setMaximised(true);
         tabs.show();
 
-    }
-
-    private static void createTempLogSection() throws Exception {
-
-        log = new ResultList("Time", "Temperature", "Heater Power");
-        log.setUnits("s", "K", "%");
-        log.setStreamingOutput("log.csv");
-        Plot tPlot = new Plot("Temperature Log", log, 0, 1);
-        Plot hPlot = new Plot("Heater Log", log, 0, 2);
-
-        tPlot.showMarkers(false);
-        hPlot.showMarkers(false);
-
-        tPlot.setMaxRange(24 * 60 * 60);
-        hPlot.setMaxRange(24 * 60 * 60);
-
-        Grid grid = new Grid("Temperature Logs", tPlot, hPlot);
-        grid.addToolbarButton("Start Log", Main::startLog);
-        grid.addToolbarButton("Stop Log", Main::stopLog);
-
-        tabs.addTab(grid);
-
-    }
-
-    private static void startLog() {
-
-        if (tempFlag) {
-            GUI.errorAlert("Error", "Already Running", "The temperature log is already running.");
-            return;
-        }
-
-        tempFlag = true;
-        Thread thread = new Thread(() -> {
-
-            double time = 0;
-            while (tempFlag) {
-                try {
-                    log.addData(time, temp.getTemperature(), temp.getHeaterPower());
-                } catch (Exception e) {
-                    System.err.println("Error communicating with ITC503!!!");
-                }
-                Util.sleep(5000);
-                time += 5.0;
-            }
-
-        });
-
-        thread.start();
-    }
-
-    private static void stopLog() {
-
-        if (!tempFlag) {
-            GUI.errorAlert("Error", "Already Stopped", "The temperature log is already stopped.");
-            return;
-        }
-
-        tempFlag = false;
     }
 
     /**
