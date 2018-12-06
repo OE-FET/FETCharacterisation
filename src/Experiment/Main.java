@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 
 /**
  * JISA Template Application.
@@ -420,21 +421,28 @@ public class Main extends GUI {
         // Do we want to use four-point-probe measurements?
         boolean useFourProbe = fourProbeT.get();
 
+        // Create an array list to put errors in
+        ArrayList<String> errors = new ArrayList<>();
+
         // Check that the source-drain and source-gate SMUs are connected and configured
         if (smuSD == null || smuG == null) {
-            GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
-            return;
+            errors.add("Source-Drain and Source-Gate SMUs are not configured.");
         }
 
         // If we are using four-point-probe measurements, make sure the two 4PP SMUs are connected and configured
         if ((smu4P1 == null || smu4P2 == null) && useFourProbe) {
-            GUI.errorAlert("Error", "Four-Probe Not Configured", "To perform four-point-probe measurements, the 4PP SMUs must be configured.");
-            return;
+            errors.add("To perform four-point-probe measurements, the 4PP SMUs must be configured.");
         }
 
         // If stopFlag == false then another experiment must be currently running
         if (!stopFlag) {
-            GUI.errorAlert("Error", "Experiment Running", "Another experiment is already running.\n\nPlease wait until it has finished.");
+            errors.add("Another experiment is already running.\n\nPlease wait until it has finished.");
+        }
+
+        // If the errors array has something in it, then we can't continue
+        if (!errors.isEmpty()) {
+            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
+            errors.clear();
             return;
         }
 
@@ -581,13 +589,18 @@ public class Main extends GUI {
         // Run that config code we stored previously
         doConfig.run();
 
+        ArrayList<String> errors = new ArrayList<>();
+
         if (smuSD == null || smuG == null) {
-            GUI.errorAlert("Error", "Not Configured", "Source-Drain and Source-Gate SMUs are not configured.");
-            return;
+            errors.add("Source-Drain and Source-Gate SMUs are not configured.");
         }
 
         if (!stopFlag) {
-            GUI.errorAlert("Error", "Experiment Running", "Another experiment is already running.\n\nPlease wait until it has finished.");
+            errors.add("Another experiment is already running.\n\nPlease wait until it has finished.");
+        }
+
+        if (!errors.isEmpty()) {
+            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
             return;
         }
 
