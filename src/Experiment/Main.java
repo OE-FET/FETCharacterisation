@@ -439,19 +439,18 @@ public class Main extends GUI {
             errors.add("Another experiment is already running.\n\nPlease wait until it has finished.");
         }
 
-        // If the errors array has something in it, then we can't continue
-        if (!errors.isEmpty()) {
-            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
-            errors.clear();
-            return;
-        }
-
         // Get the value currently in the "Output File" text-box
         String outputFile = fileT.get();
 
         // Check that it isn't blank
         if (outputFile.trim().equals("")) {
-            GUI.errorAlert("Error", "No Output File", "Please select a file to output to.");
+            errors.add("You must specify a file to output to.");
+        }
+
+        // If the errors array has something in it, then we can't continue
+        if (!errors.isEmpty()) {
+            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
+            errors.clear();
             return;
         }
 
@@ -599,15 +598,15 @@ public class Main extends GUI {
             errors.add("Another experiment is already running.\n\nPlease wait until it has finished.");
         }
 
-        if (!errors.isEmpty()) {
-            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
-            return;
-        }
-
         String outputFile = fileO.get();
 
         if (outputFile.trim().equals("")) {
-            GUI.errorAlert("Error", "No Output File", "Please select a file to output to.");
+            errors.add("You must specify a file to output to.");
+        }
+
+        if (!errors.isEmpty()) {
+            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
+            errors.clear();
             return;
         }
 
