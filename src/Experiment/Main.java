@@ -38,6 +38,7 @@ public class Main extends GUI {
     private static final double MIN_GATE_VOLTAGE_OUTPUT   = 0.0;
     private static final double MAX_GATE_VOLTAGE_OUTPUT   = -60.0;
     private static final int    STEPS_GATE_VOLTAGE_OUTPUT = 7;
+    private static final double INTEGRATION_TIME          = 1D / 50D;
 
     // ==== Transfer Curve Fields and Results ==========================================================================
     private static SetGettable<Double>  minGateT;
@@ -49,6 +50,7 @@ public class Main extends GUI {
     private static SetGettable<Double>  limitT;
     private static SetGettable<Integer> countT;
     private static SetGettable<Double>  delayT;
+    private static SetGettable<Double>  intTimeT;
     private static SetGettable<String>  fileT;
     private static SetGettable<Boolean> fourProbeT;
     private static ResultList           transferResults;
@@ -63,6 +65,7 @@ public class Main extends GUI {
     private static SetGettable<Double>  limitO;
     private static SetGettable<Integer> countO;
     private static SetGettable<Double>  delayO;
+    private static SetGettable<Double>  intTimeO;
     private static SetGettable<String>  fileO;
     private static ResultList           outputResults;
 
@@ -151,6 +154,7 @@ public class Main extends GUI {
         limitT = config.addDoubleField("Current Limit [A]");
         countT = config.addIntegerField("Averaging Count");
         delayT = config.addDoubleField("Delay Time [s]");
+        intTimeT = config.addDoubleField("Integration Time [s]");
         fileT = config.addFileSave("Output File");
         fourProbeT = config.addCheckBox("Four Probe Measurement?");
 
@@ -166,6 +170,7 @@ public class Main extends GUI {
         limitT.set(CURRENT_LIMIT);
         countT.set(AVERAGE_COUNT);
         delayT.set(DELAY_TIME);
+        intTimeT.set(INTEGRATION_TIME);
 
         // Add toolbar buttons
         transferGrid.addToolbarButton("Start Transfer", Main::doTransfer);
@@ -199,6 +204,7 @@ public class Main extends GUI {
         limitO = config.addDoubleField("Current Limit [A]");
         countO = config.addIntegerField("Averaging Count");
         delayO = config.addDoubleField("Delay Time [s]");
+        intTimeO = config.addDoubleField("Integration Time [s]");
         fileO = config.addFileSave("Output File");
 
         minGateO.set(MIN_GATE_VOLTAGE_OUTPUT);
@@ -212,6 +218,7 @@ public class Main extends GUI {
         limitO.set(CURRENT_LIMIT);
         countO.set(AVERAGE_COUNT);
         delayO.set(DELAY_TIME);
+        intTimeO.set(INTEGRATION_TIME);
 
         Table table = new Table("Table of Results", outputResults);
         Plot  plot  = new Plot("Output Curve", outputResults, 0, 2, 1);
@@ -258,12 +265,12 @@ public class Main extends GUI {
     private static void createConfigSection() throws Exception {
 
         // Create panel for Source-Drain configuration
-        Fields               sourceDrain = new Fields("Source-Drain SMU");
+        Fields sourceDrain = new Fields("Source-Drain SMU");
 
         // Adding a choice box with the options of "SMU1", "SMU2", "SMU3", and "SMU4". Will return an integer when queried
         // representing which option was chosen (0 for SMU1, 3 for SMU4 etc).
-        SetGettable<Integer> sdSMU       = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
-        SetGettable<Integer> sdChannel   = sourceDrain.addIntegerField("Channel Number");
+        SetGettable<Integer> sdSMU     = sourceDrain.addChoice("SMU", new String[]{"SMU 1", "SMU 2", "SMU 3", "SMU 4"});
+        SetGettable<Integer> sdChannel = sourceDrain.addIntegerField("Channel Number");
 
         // If the relevant config entries exist in our config storage, then load them in
         if (config.has("SDSMU") && config.has("SDCHN")) {
@@ -455,6 +462,7 @@ public class Main extends GUI {
         double currentLimit = limitT.get();
         int    averageCount = countT.get();
         int    delayMSec    = (int) (delayT.get() * 1000); // Convert to milli-seconds
+        double intTime      = intTimeT.get();
 
         // Create arrays of the voltages we are going to use
         double[] gateVoltages = Util.makeLinearArray(minVG, maxVG, stepsVG);
@@ -470,6 +478,7 @@ public class Main extends GUI {
         smuSD.setAverageMode(SMU.AMode.MEAN_REPEAT);
         smuSD.setAverageCount(averageCount);
         smuSD.useFourProbe(false);
+        smuSD.setIntegrationTime(intTime);
 
         // Configure the Gate SMU channel
         smuG.setSource(SMU.Source.VOLTAGE);
@@ -481,6 +490,7 @@ public class Main extends GUI {
         smuG.setAverageMode(SMU.AMode.MEAN_REPEAT);
         smuG.setAverageCount(averageCount);
         smuG.useFourProbe(false);
+        smuG.setIntegrationTime(intTime);
 
         if (useFourProbe) {
             // Configure the 4PP-1 SMU channel to act as a voltmeter
@@ -491,6 +501,7 @@ public class Main extends GUI {
             smu4P1.setAverageCount(averageCount);
             smu4P1.useFourProbe(false);
             smu4P1.setCurrent(0);
+            smu4P1.setIntegrationTime(intTime);
 
             // Configure the 4PP-2 SMU channel to act as a voltmeter
             smu4P2.setSource(SMU.Source.CURRENT);
@@ -500,6 +511,7 @@ public class Main extends GUI {
             smu4P2.setAverageCount(averageCount);
             smu4P2.useFourProbe(false);
             smu4P2.setCurrent(0);
+            smu4P2.setIntegrationTime(intTime);
 
             // Enable voltage probes (SMU channels)
             smu4P1.turnOn();
@@ -599,6 +611,7 @@ public class Main extends GUI {
         double currentLimit = limitO.get();
         int    averageCount = countO.get();
         int    delayMSec    = (int) (delayO.get() * 1000);
+        double intTime      = intTimeO.get();
 
         double[] gateVoltages = Util.makeLinearArray(minVG, maxVG, stepsVG);
         double[] sdVoltages   = Util.makeLinearArray(minSDV, maxSDV, stepsSDV);
@@ -612,6 +625,7 @@ public class Main extends GUI {
         smuSD.setAverageMode(SMU.AMode.MEAN_REPEAT);
         smuSD.setAverageCount(averageCount);
         smuSD.useFourProbe(false);
+        smuSD.setIntegrationTime(intTime);
 
         smuG.setSource(SMU.Source.VOLTAGE);
         smuG.setVoltageRange(2.0 * maxVG);
@@ -622,6 +636,7 @@ public class Main extends GUI {
         smuG.setAverageMode(SMU.AMode.MEAN_REPEAT);
         smuG.setAverageCount(averageCount);
         smuG.useFourProbe(false);
+        smuG.setIntegrationTime(intTime);
 
         smuSD.turnOn();
         smuG.turnOn();
