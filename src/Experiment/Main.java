@@ -30,7 +30,7 @@ public class Main extends GUI {
     private static final double MAX_G_VOLTAGE             = -60;
     private static final int    STEPS_G_VOLTAGE           = 61;
     private static final double CURRENT_LIMIT             = 1e-3;
-    private static final int    AVERAGE_COUNT             = 25;
+    private static final int    AVERAGE_COUNT             = 5;
     private static final double DELAY_TIME                = 0.5;
     private static final double MIN_SD_VOLTAGE_OUTPUT     = 0.0;
     private static final double MAX_SD_VOLTAGE_OUTPUT     = -60.0;
