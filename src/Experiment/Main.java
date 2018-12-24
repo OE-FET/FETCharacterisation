@@ -1,14 +1,13 @@
 package Experiment;
 
-import JISA.Addresses.*;
-import JISA.Control.*;
-import JISA.Devices.*;
-import JISA.Experiment.*;
+import JISA.Control.ConfigStore;
+import JISA.Control.SetGettable;
+import JISA.Devices.MCSMU;
+import JISA.Devices.SMU;
+import JISA.Experiment.ResultList;
 import JISA.GUI.*;
 import JISA.Util;
-import JISA.VISA.*;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 
 /**
