@@ -2,13 +2,16 @@ package Experiment;
 
 import JISA.Control.ConfigStore;
 import JISA.Control.Field;
+import JISA.Control.SRunnable;
 import JISA.Devices.MCSMU;
 import JISA.Devices.SMU;
 import JISA.Experiment.ResultList;
 import JISA.GUI.*;
 import JISA.Util;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * JISA Template Application.
@@ -50,7 +53,7 @@ public class Main extends GUI {
     private static Field<Double>  intTimeT;
     private static Field<String>  fileT;
     private static Field<Boolean> fourProbeT;
-    private static ResultList           transferResults;
+    private static ResultList     transferResults;
 
     // ==== Output Curve Fields and Results ============================================================================
     private static Field<Double>  minGateO;
@@ -64,7 +67,7 @@ public class Main extends GUI {
     private static Field<Double>  delayO;
     private static Field<Double>  intTimeO;
     private static Field<String>  fileO;
-    private static ResultList           outputResults;
+    private static ResultList     outputResults;
 
     // ==== Tabs GUI (main window) =====================================================================================
     private static Tabs tabs;
@@ -84,8 +87,9 @@ public class Main extends GUI {
     private static SMU smu4P2 = null;
 
     // ==== Config Storage and Set-Up ==================================================================================
-    private static ConfigStore config;
-    private static Runnable    doConfig;
+    private static ConfigStore          config;
+    private static Runnable             doConfig;
+    private static ArrayList<SRunnable> smuConfigs = new ArrayList<>();
 
     /**
      * Runs at start, this is where it all begins.
@@ -262,68 +266,10 @@ public class Main extends GUI {
      */
     private static void createConfigSection() throws Exception {
 
-        // Create panel for Source-Drain configuration
-        Fields sourceDrain = new Fields("Source-Drain SMU");
-
-        // Adding a choice box with the options of "SMU1", "SMU2", "SMU3", and "SMU4". Will return an integer when queried
-        // representing which option was chosen (0 for SMU1, 3 for SMU4 etc).
-        Field<Integer> sdSMU     = sourceDrain.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        Field<Integer> sdChannel = sourceDrain.addIntegerField("Channel Number");
-
-        // If the relevant config entries exist in our config storage, then load them in
-        if (config.has("SDSMU") && config.has("SDCHN")) {
-            sdSMU.set(config.getInt("SDSMU"));
-            sdChannel.set(config.getInt("SDCHN"));
-        } else {
-            sdSMU.set(0);
-            sdChannel.set(0);
-        }
-
-        // Add "Apply" button
-        sourceDrain.addButton("Apply", () -> smuSD = applyButton("SD", sdSMU, sdChannel, true));
-
-        // Rinse-and-repeat
-        Fields               sourceGate = new Fields("Source-Gate SMU");
-        Field<Integer> sgSMU      = sourceGate.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        Field<Integer> sgChannel  = sourceGate.addIntegerField("Channel Number");
-
-        if (config.has("SGSMU") && config.has("SGCHN")) {
-            sgSMU.set(config.getInt("SGSMU"));
-            sgChannel.set(config.getInt("SGCHN"));
-        } else {
-            sgSMU.set(1);
-            sgChannel.set(0);
-        }
-
-        sourceGate.addButton("Apply", () -> smuG = applyButton("SG", sgSMU, sgChannel, true));
-
-        Fields               fourPoint1 = new Fields("Four-Point-Probe 1");
-        Field<Integer> fp1SMU     = fourPoint1.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        Field<Integer> fp1Channel = fourPoint1.addIntegerField("Channel Number");
-
-        if (config.has("FP1SMU") && config.has("FP1CHN")) {
-            fp1SMU.set(config.getInt("FP1SMU"));
-            fp1Channel.set(config.getInt("FP1CHN"));
-        } else {
-            fp1SMU.set(2);
-            fp1Channel.set(0);
-        }
-
-        fourPoint1.addButton("Apply", () -> smu4P1 = applyButton("FP1", fp1SMU, fp1Channel, true));
-
-        Fields               fourPoint2 = new Fields("Four-Point-Probe 2");
-        Field<Integer> fp2SMU     = fourPoint2.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        Field<Integer> fp2Channel = fourPoint2.addIntegerField("Channel Number");
-
-        if (config.has("FP2SMU") && config.has("FP2CHN")) {
-            fp2SMU.set(config.getInt("FP2SMU"));
-            fp2Channel.set(config.getInt("FP2CHN"));
-        } else {
-            fp2SMU.set(3);
-            fp2Channel.set(0);
-        }
-
-        fourPoint2.addButton("Apply", () -> smu4P2 = applyButton("FP2", fp2SMU, fp2Channel, true));
+        Fields sourceDrain = addSMUConfigPanel(0, "Source-Drain SMU", "SD", (smu) -> smuSD = smu);
+        Fields sourceGate  = addSMUConfigPanel(1, "Source-Gate SMU", "SG", (smu) -> smuG = smu);
+        Fields fourPoint1  = addSMUConfigPanel(2, "Four-Point Probe 1 SMU", "FP1", (smu) -> smu4P1 = smu);
+        Fields fourPoint2  = addSMUConfigPanel(3, "Four-Point Probe 2 SMU", "FP2", (smu) -> smu4P2 = smu);
 
         Grid grid = new Grid("Instrument Config", sourceDrain, sourceGate, fourPoint1, fourPoint2);
         grid.setNumColumns(1);
@@ -334,15 +280,77 @@ public class Main extends GUI {
         doConfig = () -> {
 
             try {
-                smuSD = applyButton("SD", sdSMU, sdChannel, false);
-                smuG = applyButton("SG", sgSMU, sgChannel, false);
-                smu4P1 = applyButton("FP1", fp1SMU, fp1Channel, false);
-                smu4P2 = applyButton("FP2", fp2SMU, fp2Channel, false);
+                for (SRunnable r : smuConfigs) {
+                    r.run();
+                }
             } catch (Exception e) {
                 System.err.println(e.getMessage());
             }
 
         };
+
+    }
+
+    private interface Settable<T> {
+        void set(T value);
+    }
+
+    private static Fields addSMUConfigPanel(int i, String title, String tag, Settable<SMU> toSet) {
+
+        Fields         panel   = new Fields(title);
+        Field<Integer> smu     = panel.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
+        Field<Integer> channel = panel.addChoice("Channel", "Channel 0", "Channel 1", "Channel 2", "Channel 3");
+
+        smu.setOnChange(() -> updateSMUPanel(channel, smu));
+
+        panel.addButton("Apply", () -> toSet.set(applyButton(tag, smu, channel, true)));
+        smuConfigs.add(() -> toSet.set(applyButton(tag, smu, channel, false)));
+
+        String smuKey = String.format("%sSMU", tag);
+        String chnKey = String.format("%sCHN", tag);
+
+        if (config.has(smuKey) && config.has(chnKey)) {
+            smu.set(config.getInt(smuKey));
+            channel.set(config.getInt(chnKey));
+        } else {
+            smu.set(i);
+            channel.set(0);
+        }
+
+        return panel;
+
+    }
+
+    private static void updateSMUPanel(Field<Integer> channelI, Field<Integer> smuI) {
+
+        if (smuI.get() < 0 || smuI.get() > 3) {
+            return;
+        }
+
+        // Store SMUs in array for easy access
+        InstrumentConfig[] SMUs = new InstrumentConfig[]{smu1, smu2, smu3, smu4};
+
+        SMU smu = (SMU) SMUs[smuI.get()].get();
+
+        if (smu == null) {
+            channelI.editValues("Channel 0", "Channel 1", "Channel 2", "Channel 3");
+            channelI.set(0);
+            return;
+        }
+
+        if (smu instanceof MCSMU) {
+            int      n      = ((MCSMU) smu).getNumChannels();
+            String[] values = new String[n];
+            for (int i = 0; i < n; i++) {
+                values[i] = String.format("Channel %d", i);
+            }
+            channelI.editValues(values);
+            channelI.set(channelI.get());
+        } else {
+            channelI.editValues("N/A");
+            channelI.set(0);
+            return;
+        }
 
     }
 
@@ -426,8 +434,12 @@ public class Main extends GUI {
         LinkedList<String> errors = new LinkedList<>();
 
         // Check that the source-drain and source-gate SMUs are connected and configured
-        if (smuSD == null || smuG == null) {
-            errors.add("Source-Drain and Source-Gate SMUs are not configured.");
+        if (smuSD == null) {
+            errors.add("The Source-Drain SMU is not configured.");
+        }
+
+        if (smuG == null) {
+            errors.add("The Source-Gate SMU is not configured.");
         }
 
         // If we are using four-point-probe measurements, make sure the two 4PP SMUs are connected and configured
@@ -450,7 +462,7 @@ public class Main extends GUI {
 
         // If the errors array has something in it, then we can't continue
         if (!errors.isEmpty()) {
-            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
+            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors), 600);
             errors.clear();
             return;
         }
@@ -586,8 +598,12 @@ public class Main extends GUI {
         LinkedList<String> errors = new LinkedList<>();
 
         // If the source-drain and/or gate SMU is not connected/configured then we can't continue
-        if (smuSD == null || smuG == null) {
-            errors.add("Source-Drain and Source-Gate SMUs are not configured.");
+        if (smuSD == null) {
+            errors.add("The Source-Drain SMU is not configured.");
+        }
+
+        if (smuG == null) {
+            errors.add("The Source-Gate SMU is not configured.");
         }
 
         // If stopFlag == false then another measurement must already be running
@@ -605,7 +621,7 @@ public class Main extends GUI {
 
         // If there is anything in the errors array, then we cannot continue
         if (!errors.isEmpty()) {
-            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors));
+            GUI.errorAlert("Error", "Could Not Start Experiment", String.join("\n\n", errors), 600);
             errors.clear();
             return;
         }
