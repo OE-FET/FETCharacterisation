@@ -149,6 +149,8 @@ public class Main extends GUI {
         maxGateT = params.addDoubleField("Max Gate [V]");
         gateStepsT = params.addIntegerField("No. Steps");
 
+        params.addSeparator();
+
         minSDT = params.addDoubleField("Min SD [V]");
         maxSDT = params.addDoubleField("Max SD [V]");
         sdStepsT = params.addIntegerField("No. Steps");
@@ -198,6 +200,8 @@ public class Main extends GUI {
         minGateO = params.addDoubleField("Min Gate [V]");
         maxGateO = params.addDoubleField("Max Gate [V]");
         gateStepsO = params.addIntegerField("No. Steps");
+
+        params.addSeparator();
 
         minSDO = params.addDoubleField("Min SD [V]");
         maxSDO = params.addDoubleField("Max SD [V]");
