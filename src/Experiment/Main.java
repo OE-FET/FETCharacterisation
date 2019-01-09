@@ -245,7 +245,7 @@ public class Main extends GUI {
 
         // Create a ConfigGrid - a grid of Instrument Connection configuration panels
         ConfigGrid grid = new ConfigGrid("Connection Config", config);
-        grid.setNumColumns(1);
+        grid.setNumColumns(2);
 
         // Add instruments to configure, returns GetSettable objects for the relevant instrument objects
         smu1 = grid.addInstrument("SMU 1", SMU.class);
@@ -272,7 +272,8 @@ public class Main extends GUI {
         Fields fourPoint2  = addSMUConfigPanel(3, "Four-Point Probe 2 SMU", "FP2", (smu) -> smu4P2 = smu);
 
         Grid grid = new Grid("Instrument Config", sourceDrain, sourceGate, fourPoint1, fourPoint2);
-        grid.setNumColumns(1);
+        grid.setNumColumns(2);
+        grid.setGrowth(true, false);
 
         tabs.addTab(grid);
 
