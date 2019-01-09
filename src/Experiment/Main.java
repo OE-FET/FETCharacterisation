@@ -1,7 +1,7 @@
 package Experiment;
 
 import JISA.Control.ConfigStore;
-import JISA.Control.SetGettable;
+import JISA.Control.Field;
 import JISA.Devices.MCSMU;
 import JISA.Devices.SMU;
 import JISA.Experiment.ResultList;
@@ -38,32 +38,32 @@ public class Main extends GUI {
     private static final double INTEGRATION_TIME          = 1D / 50D;
 
     // ==== Transfer Curve Fields and Results ==========================================================================
-    private static SetGettable<Double>  minGateT;
-    private static SetGettable<Double>  maxGateT;
-    private static SetGettable<Integer> gateStepsT;
-    private static SetGettable<Double>  minSDT;
-    private static SetGettable<Double>  maxSDT;
-    private static SetGettable<Integer> sdStepsT;
-    private static SetGettable<Double>  limitT;
-    private static SetGettable<Integer> countT;
-    private static SetGettable<Double>  delayT;
-    private static SetGettable<Double>  intTimeT;
-    private static SetGettable<String>  fileT;
-    private static SetGettable<Boolean> fourProbeT;
+    private static Field<Double>  minGateT;
+    private static Field<Double>  maxGateT;
+    private static Field<Integer> gateStepsT;
+    private static Field<Double>  minSDT;
+    private static Field<Double>  maxSDT;
+    private static Field<Integer> sdStepsT;
+    private static Field<Double>  limitT;
+    private static Field<Integer> countT;
+    private static Field<Double>  delayT;
+    private static Field<Double>  intTimeT;
+    private static Field<String>  fileT;
+    private static Field<Boolean> fourProbeT;
     private static ResultList           transferResults;
 
     // ==== Output Curve Fields and Results ============================================================================
-    private static SetGettable<Double>  minGateO;
-    private static SetGettable<Double>  maxGateO;
-    private static SetGettable<Integer> gateStepsO;
-    private static SetGettable<Double>  minSDO;
-    private static SetGettable<Double>  maxSDO;
-    private static SetGettable<Integer> sdStepsO;
-    private static SetGettable<Double>  limitO;
-    private static SetGettable<Integer> countO;
-    private static SetGettable<Double>  delayO;
-    private static SetGettable<Double>  intTimeO;
-    private static SetGettable<String>  fileO;
+    private static Field<Double>  minGateO;
+    private static Field<Double>  maxGateO;
+    private static Field<Integer> gateStepsO;
+    private static Field<Double>  minSDO;
+    private static Field<Double>  maxSDO;
+    private static Field<Integer> sdStepsO;
+    private static Field<Double>  limitO;
+    private static Field<Integer> countO;
+    private static Field<Double>  delayO;
+    private static Field<Double>  intTimeO;
+    private static Field<String>  fileO;
     private static ResultList           outputResults;
 
     // ==== Tabs GUI (main window) =====================================================================================
@@ -115,6 +115,7 @@ public class Main extends GUI {
 
         // Make sure the window is maximised and show it
         tabs.setMaximised(true);
+        tabs.setExitOnClose(true);
         tabs.show();
 
     }
@@ -139,7 +140,7 @@ public class Main extends GUI {
         // Put them all in a grid
         Grid transferGrid = new Grid("Transfer Curve", params, config, table, plot);
 
-        // Add fields to panels, returning SetGettable objects which allow use to query and set the value in each field
+        // Add fields to panels, returning Field objects which allow use to query and set the value in each field
         minGateT = params.addDoubleField("Min Gate [V]");
         maxGateT = params.addDoubleField("Max Gate [V]");
         gateStepsT = params.addIntegerField("No. Steps");
@@ -266,8 +267,8 @@ public class Main extends GUI {
 
         // Adding a choice box with the options of "SMU1", "SMU2", "SMU3", and "SMU4". Will return an integer when queried
         // representing which option was chosen (0 for SMU1, 3 for SMU4 etc).
-        SetGettable<Integer> sdSMU     = sourceDrain.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        SetGettable<Integer> sdChannel = sourceDrain.addIntegerField("Channel Number");
+        Field<Integer> sdSMU     = sourceDrain.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
+        Field<Integer> sdChannel = sourceDrain.addIntegerField("Channel Number");
 
         // If the relevant config entries exist in our config storage, then load them in
         if (config.has("SDSMU") && config.has("SDCHN")) {
@@ -283,8 +284,8 @@ public class Main extends GUI {
 
         // Rinse-and-repeat
         Fields               sourceGate = new Fields("Source-Gate SMU");
-        SetGettable<Integer> sgSMU      = sourceGate.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        SetGettable<Integer> sgChannel  = sourceGate.addIntegerField("Channel Number");
+        Field<Integer> sgSMU      = sourceGate.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
+        Field<Integer> sgChannel  = sourceGate.addIntegerField("Channel Number");
 
         if (config.has("SGSMU") && config.has("SGCHN")) {
             sgSMU.set(config.getInt("SGSMU"));
@@ -297,8 +298,8 @@ public class Main extends GUI {
         sourceGate.addButton("Apply", () -> smuG = applyButton("SG", sgSMU, sgChannel, true));
 
         Fields               fourPoint1 = new Fields("Four-Point-Probe 1");
-        SetGettable<Integer> fp1SMU     = fourPoint1.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        SetGettable<Integer> fp1Channel = fourPoint1.addIntegerField("Channel Number");
+        Field<Integer> fp1SMU     = fourPoint1.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
+        Field<Integer> fp1Channel = fourPoint1.addIntegerField("Channel Number");
 
         if (config.has("FP1SMU") && config.has("FP1CHN")) {
             fp1SMU.set(config.getInt("FP1SMU"));
@@ -311,8 +312,8 @@ public class Main extends GUI {
         fourPoint1.addButton("Apply", () -> smu4P1 = applyButton("FP1", fp1SMU, fp1Channel, true));
 
         Fields               fourPoint2 = new Fields("Four-Point-Probe 2");
-        SetGettable<Integer> fp2SMU     = fourPoint2.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
-        SetGettable<Integer> fp2Channel = fourPoint2.addIntegerField("Channel Number");
+        Field<Integer> fp2SMU     = fourPoint2.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
+        Field<Integer> fp2Channel = fourPoint2.addIntegerField("Channel Number");
 
         if (config.has("FP2SMU") && config.has("FP2CHN")) {
             fp2SMU.set(config.getInt("FP2SMU"));
@@ -345,7 +346,7 @@ public class Main extends GUI {
 
     }
 
-    private static SMU applyButton(String tag, SetGettable<Integer> smuI, SetGettable<Integer> channelI, boolean message) throws Exception {
+    private static SMU applyButton(String tag, Field<Integer> smuI, Field<Integer> channelI, boolean message) throws Exception {
 
         config.set(tag + "SMU", smuI.get());
         config.set(tag + "CHN", channelI.get());
