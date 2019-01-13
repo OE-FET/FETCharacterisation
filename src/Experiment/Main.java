@@ -11,7 +11,6 @@ import JISA.Util;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * JISA Template Application.
@@ -88,7 +87,6 @@ public class Main extends GUI {
 
     // ==== Config Storage and Set-Up ==================================================================================
     private static ConfigStore          config;
-    private static Runnable             doConfig;
     private static ArrayList<SRunnable> smuConfigs = new ArrayList<>();
 
     /**
@@ -127,9 +125,8 @@ public class Main extends GUI {
     /**
      * Creates the "Transfer Curve" tab in the GUI, for controlling and observing transfer curve measurements.
      *
-     * @throws Exception Upon something going wrong
      */
-    private static void createTransferSection() throws Exception {
+    private static void createTransferSection() {
 
         // Create config panels
         Fields params = new Fields("Experiment Parameters");
@@ -189,9 +186,8 @@ public class Main extends GUI {
     /**
      * Creates the "Output Curve" tab in the GUI, for controlling and observing output curve measurements.
      *
-     * @throws Exception Upon something going wrong
      */
-    private static void createOutputSection() throws Exception {
+    private static void createOutputSection() {
 
         // Create config panels
         Fields params = new Fields("Experiment Parameters");
@@ -245,7 +241,7 @@ public class Main extends GUI {
     /**
      * Creates the "Connection Config" tab in the GUI for configuring how to connect to each instrument.
      */
-    private static void createConnectionSection() throws Exception {
+    private static void createConnectionSection() {
 
         // Create a ConfigGrid - a grid of Instrument Connection configuration panels
         ConfigGrid grid = new ConfigGrid("Connection Config", config);
@@ -268,7 +264,7 @@ public class Main extends GUI {
     /**
      * Creates the "Instrument Config" tab in the GUI for configuring which SMU channel should be used for what.
      */
-    private static void createConfigSection() throws Exception {
+    private static void createConfigSection() {
 
         Fields sourceDrain = addSMUConfigPanel(0, "Source-Drain SMU", "SD", (smu) -> smuSD = smu);
         Fields sourceGate  = addSMUConfigPanel(1, "Source-Gate SMU", "SG", (smu) -> smuG = smu);
@@ -281,19 +277,6 @@ public class Main extends GUI {
 
         tabs.addTab(grid);
 
-        // Keep this for later when we want to apply all at once
-        doConfig = () -> {
-
-            try {
-                for (SRunnable r : smuConfigs) {
-                    r.run();
-                }
-            } catch (Exception e) {
-                System.err.println(e.getMessage());
-            }
-
-        };
-
     }
 
     private interface Settable<T> {
@@ -305,21 +288,25 @@ public class Main extends GUI {
         Fields         panel   = new Fields(title);
         Field<Integer> smu     = panel.addChoice("SMU", "SMU 1", "SMU 2", "SMU 3", "SMU 4");
         Field<Integer> channel = panel.addChoice("Channel", "Channel 0", "Channel 1", "Channel 2", "Channel 3");
+        Field<Integer> terms   = panel.addChoice("Terminals", "Front", "Rear");
 
         smu.setOnChange(() -> updateSMUPanel(channel, smu));
 
-        panel.addButton("Apply", () -> toSet.set(applyButton(tag, smu, channel, true)));
-        smuConfigs.add(() -> toSet.set(applyButton(tag, smu, channel, false)));
+        panel.addButton("Apply", () -> toSet.set(applyButton(tag, smu, channel, terms, true)));
+        smuConfigs.add(() -> toSet.set(applyButton(tag, smu, channel, terms, false)));
 
         String smuKey = String.format("%sSMU", tag);
         String chnKey = String.format("%sCHN", tag);
+        String trmKey = String.format("%sTRM", tag);
 
-        if (config.has(smuKey) && config.has(chnKey)) {
+        if (config.has(smuKey) && config.has(chnKey) && config.has(trmKey)) {
             smu.set(config.getInt(smuKey));
             channel.set(config.getInt(chnKey));
+            terms.set(config.getInt(trmKey));
         } else {
             smu.set(i);
             channel.set(0);
+            terms.set(1);
         }
 
         return panel;
@@ -354,15 +341,15 @@ public class Main extends GUI {
         } else {
             channelI.editValues("N/A");
             channelI.set(0);
-            return;
         }
 
     }
 
-    private static SMU applyButton(String tag, Field<Integer> smuI, Field<Integer> channelI, boolean message) throws Exception {
+    private static SMU applyButton(String tag, Field<Integer> smuI, Field<Integer> channelI, Field<Integer> terms, boolean message) throws Exception {
 
         config.set(tag + "SMU", smuI.get());
         config.set(tag + "CHN", channelI.get());
+        config.set(tag + "TRM", terms.get());
 
         // Store SMUs in array for easy access
         InstrumentConfig[] SMUs = new InstrumentConfig[]{smu1, smu2, smu3, smu4};
@@ -389,6 +376,8 @@ public class Main extends GUI {
         // Get the channel number the user has specified
         int channel = channelI.get();
 
+        SMU toReturn;
+
         // If it's a multi-channel SMU then we need to use the channel to number to select the correct channel
         if (smu instanceof MCSMU) {
 
@@ -399,11 +388,26 @@ public class Main extends GUI {
                 return null;
             }
 
-            return ((MCSMU) smu).getChannel(channel);
+            toReturn = ((MCSMU) smu).getChannel(channel);
 
         } else {
-            return smu;
+            toReturn = smu;
         }
+
+        switch(terms.get()) {
+
+            case 0:
+                toReturn.setTerminals(SMU.Terminals.FRONT);
+                break;
+
+            case 1:
+                toReturn.setTerminals(SMU.Terminals.REAR);
+                break;
+
+        }
+
+        return toReturn;
+
     }
 
     /**
@@ -418,8 +422,11 @@ public class Main extends GUI {
         stopFlag = true;
     }
 
-    private static void applyChannelConfiguration() {
-        doConfig.run();
+    private static void applyChannelConfiguration() throws Exception {
+
+        for (SRunnable r : smuConfigs) {
+            r.run();
+        }
     }
 
     /**
@@ -430,7 +437,7 @@ public class Main extends GUI {
     private static void doTransfer() throws Exception {
 
         // Make sure we have applied our config before running
-        doConfig.run();
+        applyChannelConfiguration();
 
         // Do we want to use four-point-probe measurements?
         boolean useFourProbe = fourProbeT.get();
@@ -598,7 +605,7 @@ public class Main extends GUI {
     private static void doOutput() throws Exception {
 
         // Run that config code we stored previously
-        doConfig.run();
+        applyChannelConfiguration();
 
         LinkedList<String> errors = new LinkedList<>();
 
