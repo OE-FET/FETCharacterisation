@@ -5,7 +5,6 @@
     </CLASSES>
     <JAVADOC />
     <SOURCES>
-      <root url="jar://$PROJECT_DIR$/lib/JISA.jar!/src" />
       <root url="jar://$PROJECT_DIR$/lib/JISA.jar!/" />
       <root url="file://$PROJECT_DIR$/../JISA/src" />
     </SOURCES>
