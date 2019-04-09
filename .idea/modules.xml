@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/FETCharacterisation.iml" filepath="$PROJECT_DIR$/.idea/FETCharacterisation.iml" />
       <module fileurl="file://$PROJECT_DIR$/FETCharacterisation.iml" filepath="$PROJECT_DIR$/FETCharacterisation.iml" />
     </modules>
   </component>
